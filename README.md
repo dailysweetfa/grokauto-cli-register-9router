@@ -17,8 +17,18 @@ Grok Register adalah sebuah alat registrasi otomatis Python yang ditujukan untuk
 
 > Proyek ini hanya digunakan untuk penelitian alur otomatisasi, verifikasi lingkungan pengujian, dan pembelajaran pribadi. Harap patuhi ketentuan layanan situs web target, hukum dan peraturan setempat, serta batasan layanan pihak ketiga.
 
+> [!WARNING]
+> **Pernyataan Keamanan & Antivirus (False Positive)**:
+> Beberapa program antivirus (seperti Windows Defender) mungkin mendeteksi file aplikasi ini (khususnya `grok_core.pyd`) sebagai *Riskware* atau *Hacktool*. 
+> Hal ini adalah **salah deteksi (False Positive)** yang wajar terjadi karena:
+> 1. Aplikasi ini mengontrol browser Google Chrome secara otomatis menggunakan teknik **Web Automation** untuk mengisi formulir dan memproses verifikasi Turnstile.
+> 2. Bagian inti program (`grok_core.pyd`) sengaja dikompilasi ke format biner terenkripsi untuk melindungi source code program agar tidak disalahgunakan atau dibajak.
+>
+> **Aplikasi ini 100% aman dan tidak mencuri data.** Semua hasil registrasi akun disimpan secara lokal di folder komputer Anda sendiri (dalam file `accounts_*.txt`). Tidak ada pengiriman data sensitif ke server pihak ketiga mana pun. Jika terdeteksi oleh antivirus Anda, silakan tambahkan folder aplikasi ini ke daftar pengecualian (*exclusion/whitelist*) antivirus Anda.
+
 ## 📋 Daftar Isi
 
+- [Pernyataan Keamanan (Disclaimer)](#-pernyataan-keamanan--antivirus-false-positive)
 - [Persyaratan Sistem](#persyaratan-sistem)
 - [Panduan Instalasi Cepat](#-panduan-instalasi-cepat)
 - [Konfigurasi Provider Email](#%EF%B8%8F-konfigurasi-provider-email)
