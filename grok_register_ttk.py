@@ -668,9 +668,17 @@ class GrokRegisterGUI:
         self.log_text.delete(1.0, tk.END)
 
     def update_stats(self):
+        try:
+            self.root.after(0, self._do_update_stats)
+        except Exception:
+            pass
+
+    def _do_update_stats(self):
         self.stats_var.set(f"Sukses: {self.success_count} | Gagal: {self.fail_count}")
         self.success_count_var.set(str(self.success_count))
         self.fail_count_var.set(str(self.fail_count))
+        if self.is_running:
+            self.root.after(1000, self._do_update_stats)
 
     def _set_running_ui(self, running):
         self.is_running = running
