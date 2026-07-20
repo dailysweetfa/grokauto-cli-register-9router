@@ -726,8 +726,6 @@ class GrokRegisterGUI:
         config["register_count"] = count
         save_config()
         self.stop_requested = False
-        self.success_count = 0
-        self.fail_count = 0
         self.results = []
         now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.accounts_output_file = os.path.join(
