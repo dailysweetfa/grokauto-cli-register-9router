@@ -25,6 +25,16 @@ os.environ.setdefault("TK_SILENCE_DEPRECATION", "1")
 
 import grok_core
 from grok_core import *
+from grok_core import (
+    _wait_cpa_async_threads,
+    _stats_lock,
+    _get_browser,
+    _get_page,
+    _set_worker_id,
+    _track_cpa_async_thread,
+    _join_threads_interruptible,
+    _io_lock
+)
 
 def setup_light_theme(root):
     try:
