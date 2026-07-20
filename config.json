@@ -39,7 +39,7 @@
     "browser_restart_every": 10,
     "cpa_mint_async": true,
     "browser_use_custom_ua": false,
-    "license_key": "PERM-7351B9393E8D-E5546B",
+    "license_key": "",
     "license_activated_data": "eyJhY3RpdmF0ZWRfYXQiOiAxNzg0NTI5NTY1LCAiZXhwaXJlc19hdCI6IC0xLCAiaHdpZCI6ICI3MTYzMjM1NTAzMTQwRDgxIiwgImtleSI6ICJQRVJNLTczNTFCOTM5M0U4RC1FNTU0NkIifQ==:4e887bf174177f35dd8535cd225ba604e632d9e1436aafd91d558d2c3261381c",
     "license_server_url": "",
     "log_level": "info",
