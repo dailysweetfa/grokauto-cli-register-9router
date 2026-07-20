@@ -10,18 +10,10 @@ Grok Register adalah sebuah alat registrasi otomatis Python yang ditujukan untuk
   <img src="https://img.shields.io/badge/Interface-GUI%20%2B%20CLI-success.svg" alt="GUI + CLI">
   <img src="https://img.shields.io/badge/Browser-Chromium%2FChrome-4285F4.svg" alt="Chromium/Chrome">
   <a href="http://makeapullrequest.com"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
-  <a href="https://linux.do"><img src="https://img.shields.io/badge/Join-linux.do-orange" alt="linux.do"></a>
+
 </p>
 
-<p align="center">
- <a href="https://www.star-history.com/aaronl725/grok-register">
-  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/badge?repo=AaronL725/grok-register&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/badge?repo=AaronL725/grok-register" />
-   <img alt="Star History Rank" src="https://api.star-history.com/badge?repo=AaronL725/grok-register" />
-  </picture>
- </a>
-</p>
+
 
 </div>
 
@@ -41,8 +33,7 @@ Grok Register adalah sebuah alat registrasi otomatis Python yang ditujukan untuk
 - [Pertanyaan yang Sering Diajukan (FAQ)](#pertanyaan-yang-sering-diajukan-faq)
 - [Struktur Direktori](#struktur-direktori)
 - [Lisensi](#lisensi)
-- [Apresiasi](#apresiasi)
-- [Riwayat Star](#riwayat-star)
+
 
 ## Fitur
 
@@ -312,16 +303,4 @@ Domain email publik gratis (seperti bawaan Mail.tm, DuckMail, atau YYDS publik) 
 
 Didistribusikan di bawah Lisensi [MIT](LICENSE).
 
-## Apresiasi
 
-Terima kasih kepada komunitas teknologi [linux.do](https://linux.do) — tempat yang hangat dan dinamis di mana proyek ini dibagikan dan didiskusikan bersama.
-
-## Riwayat Star
-
-<a href="https://www.star-history.com/?repos=AaronL725%2Fgrok-register&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=AaronL725/grok-register&type=date&theme=dark&legend=top-left&sealed_token=uCM--S2xEp0n8rFUZHUg6wUJOgYcfO4XEVCIF9UZAT04YjL9YsMEOVOGAOlQfqwsoS7cQef0Rwc1cYCY4lAmTuMmcg-hKzNnx1A7KNekuCXQotFd4YifLIkvJWOEy5vxiREJX80Mwxbr8F-3GfCv0utIsQz_iq19nS57svUqwv0mSosV8OTxqXTLjmsI" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=AaronL725/grok-register&type=date&legend=top-left&sealed_token=uCM--S2xEp0n8rFUZHUg6wUJOgYcfO4XEVCIF9UZAT04YjL9YsMEOVOGAOlQfqwsoS7cQef0Rwc1cYCY4lAmTuMmcg-hKzNnx1A7KNekuCXQotFd4YifLIkvJWOEy5vxiREJX80Mwxbr8F-3GfCv0utIsQz_iq19nS57svUqwv0mSosV8OTxqXTLjmsI" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=AaronL725/grok-register&type=date&legend=top-left&sealed_token=uCM--S2xEp0n8rFUZHUg6wUJOgYcfO4XEVCIF9UZAT04YjL9YsMEOVOGAOlQfqwsoS7cQef0Rwc1cYCY4lAmTuMmcg-hKzNnx1A7KNekuCXQotFd4YifLIkvJWOEy5vxiREJX80Mwxbr8F-3GfCv0utIsQz_iq19nS57svUqwv0mSosV8OTxqXTLjmsI" />
- </picture>
-</a>
