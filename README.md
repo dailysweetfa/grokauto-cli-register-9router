@@ -1,231 +1,152 @@
 <div align="center">
 
+# 🤖 Grok Register - Auto Registration Toolkit 🤖
+
 [![Grok Register — GUI and CLI registration automation toolkit](assets/banner.png)](https://github.com/AaronL725/grok-register)
 
-Grok Register adalah sebuah alat registrasi otomatis Python yang ditujukan untuk penelitian alur otomatisasi, verifikasi lingkungan pengujian, dan pembelajaran pribadi — mendukung GUI / CLI, email sementara, kontrol alur browser, output akun, dan penulisan token pool grok2api.
+**Grok Register** adalah alat otomatisasi pendaftaran akun Grok (x.ai) berbasis Python yang mendukung antarmuka visual (**GUI**) maupun terminal (**CLI**). Dilengkapi dengan penanganan Cloudflare Turnstile, dukungan email sementara, dan integrasi otomatis ke pool **9Router**.
 
-<p>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="Lisensi: MIT"></a>
-  <img src="https://img.shields.io/badge/Python-3.9%2B-3776AB.svg" alt="Python 3.9+">
-  <img src="https://img.shields.io/badge/Interface-GUI%20%2B%20CLI-success.svg" alt="GUI + CLI">
-  <img src="https://img.shields.io/badge/Browser-Chromium%2FChrome-4285F4.svg" alt="Chromium/Chrome">
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.14-3776AB.svg?style=flat-square&logo=python" alt="Python 3.14">
+  <img src="https://img.shields.io/badge/OS-Windows-0078D6.svg?style=flat-square&logo=windows" alt="Windows Only">
+  <img src="https://img.shields.io/badge/Interface-GUI%20%2B%20CLI-success.svg?style=flat-square" alt="GUI + CLI">
+  <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License: MIT">
 </p>
 
 </div>
 
 ---
 
-> Proyek ini hanya digunakan untuk penelitian alur otomatisasi, verifikasi lingkungan pengujian, dan pembelajaran pribadi. Harap patuhi ketentuan layanan situs web target, hukum dan peraturan setempat, serta batasan layanan pihak ketiga.
-
-> [!NOTE]
-> **Keamanan & Privasi Data**:
-> Bagian inti program ini (**`grok_core.pyd`**) didistribusikan dalam bentuk **modul terkompilasi** untuk menjaga keamanan dan integritas sistem lisensi.
-> Semua data hasil pendaftaran disimpan **100% secara lokal** di perangkat Anda (dalam file `accounts_*.txt` dan `tokens.txt`). Tidak ada pengiriman data ke server pihak ketiga mana pun.
-
-## 📋 Daftar Isi
-
-- [Pernyataan Keamanan (Disclaimer)](#-pernyataan-keamanan--antivirus-false-positive)
-- [Persyaratan Sistem](#persyaratan-sistem)
-- [Panduan Instalasi Cepat](#-panduan-instalasi-cepat)
-- [Konfigurasi Provider Email](#%EF%B8%8F-konfigurasi-provider-email)
-  - [1. Duckmail (Default)](#1-duckmail-tanpa-api-key)
-  - [2. YYDS Mail](#2-yyds-mail-wajib-api-keyjwt)
-  - [3. Cloudflare Temp Mail / AyriMail (Rekomendasi)](#3-cloudflare-temp-mail--ayrimail-temp-mail-pribadi)
-  - [4. Mail.tm](#4-mailtm-cadangan)
-- [Cara Menjalankan Aplikasi](#-cara-menjalankan-aplikasi)
-- [File Hasil Output](#-file-hasil-output)
-- [Fitur & Mekanisme Stabilitas](#fitur--mekanisme-stabilitas)
-- [Tanya Jawab (FAQ)](#tanya-jawab-faq)
-- [Struktur Direktori](#struktur-direktori)
-- [Lisensi](#lisensi)
+> [!WARNING]  
+> **DISCLAIMER / PERNYATAAN HUKUM**:  
+> Alat ini dibuat hanya untuk tujuan penelitian otomatisasi web, pengujian integrasi sistem, dan edukasi pribadi. Harap patuhi Ketentuan Layanan (ToS) dari situs web target, undang-undang setempat, serta kebijakan penyedia pihak ketiga. Penyalahgunaan alat ini di luar tanggung jawab pengembang.
 
 ---
 
-## Persyaratan Sistem
+## ⚡ INFORMASI SANGAT PENTING (WAJIB DIBACA)
 
-Sebelum memulai, pastikan komputer Anda telah terpasang:
-1. **Python versi 3.9 s.d 3.13** (Direkomendasikan menggunakan Python 3.12 atau 3.13. Python 3.14 dapat memicu TLS Exception pada beberapa library).
-2. **Google Chrome** atau Chromium browser.
-3. **Dependensi Sistem (Khusus Pengguna Linux)**:
-   * Jika ingin menggunakan mode **GUI**, Anda perlu memasang pustaka Tkinter:
-     ```bash
-     sudo apt-get install python3-tk
-     ```
-   * Pastikan Google Chrome / Chromium sudah terpasang di distro Linux Anda (misal via `apt` atau manager paket bawaan).
-4. Koneksi internet yang stabil dan dapat mengakses halaman pendaftaran x.ai / Grok.
+> [!IMPORTANT]
+> **Sistem Operasi**: Program ini **HANYA MENDUKUNG SISTEM OPERASI WINDOWS**. Sistem operasi lain tidak didukung karena bagian logika utama program didistribusikan dalam bentuk biner terkompilasi khusus untuk Windows.
+
+Bagian logika utama program ini (**`grok_core.pyd`**) didistribusikan dalam bentuk biner terkompilasi (C-Extension) untuk alasan keamanan lisensi dan performa. Agar program ini dapat berjalan tanpa error, pastikan perangkat Anda memenuhi syarat wajib berikut:
+
+1. **Wajib Menggunakan Python 3.14.x (64-bit)**
+   * Biner `grok_core.pyd` dikompilasi secara khusus menggunakan **Python 3.14**. Jika Anda menggunakan Python versi lain (seperti 3.10, 3.11, atau 3.12), program akan memunculkan error `DLL load failed`.
+2. **Wajib Memasang Microsoft Visual C++ Redistributable**
+   * PC Windows memerlukan komponen runtime ini untuk memuat biner `.pyd` terkompilasi. Tanpa ini, program tidak akan bisa mendeteksi modul utama.
 
 ---
 
-## 🚀 Panduan Instalasi Cepat
+## 📦 Bahan-Bahan yang Wajib Diinstal
 
-Ikuti langkah mudah berikut untuk memasang aplikasi:
+Sebelum menjalankan program, unduh dan pasang bahan-bahan di bawah ini:
 
-1. **Unduh Proyek**:
-   Clone repositori ini atau ekstrak file zip ke komputer Anda:
-   ```bash
-   git clone https://github.com/AaronL725/grok-register.git
-   cd grok-register
-   ```
+| Nama Bahan | Deskripsi & Fungsi | Link Unduhan Resmi |
+| :--- | :--- | :--- |
+| **Python 3.14.x** | Mesin utama untuk menjalankan skrip. **Wajib versi 3.14**! | 📥 [Download Python 3.14.3 (Windows x64)](https://www.python.org/ftp/python/3.14.3/python-3.14.3-amd64.exe) |
+| **VC++ Runtime** | Pustaka Windows agar file biner `.pyd` dapat dimuat. | 📥 [Download VC++ Redistributable (x64)](https://aka.ms/vs/17/release/vc_redist.x64.exe) |
+| **Google Chrome** | Browser nyata yang digunakan oleh bot untuk memproses pendaftaran. | 📥 [Download Google Chrome Resmi](https://www.google.com/chrome/) |
 
-2. **Instal Dependensi (Library pendukung)**:
-   Buka terminal/CMD di folder tersebut dan jalankan:
+---
+
+## 🚀 Panduan Pemasangan Lengkap (Untuk Pemula)
+
+Ikuti langkah-langkah mudah berikut dari awal sampai siap pakai:
+
+### Langkah 1: Instalasi Python 3.14
+1. Buka file installer Python 3.14 yang sudah Anda unduh.
+2. ⚠️ **PENTING**: Di bagian bawah jendela installer, beri centang pada kotak **"Add python.exe to PATH"**. Jika Anda tidak mencentangnya, perintah `python` tidak akan dikenali di CMD.
+3. Klik **"Install Now"** dan tunggu hingga proses selesai.
+
+### Langkah 2: Instalasi Microsoft Visual C++ Redistributable
+1. Jalankan installer `vc_redist.x64.exe`.
+2. Centang kotak persetujuan lisensi (*I agree*), lalu klik **"Install"**.
+3. Jika meminta restart PC setelah instalasi, silakan restart PC Anda terlebih dahulu.
+
+### Langkah 3: Ekstrak File Program
+1. Ekstrak file ZIP program ini ke dalam satu folder (misalnya di `D:\grok-register`).
+2. Pastikan file **`grok_core.pyd`** dan **`grok_register_ttk.py`** berada di dalam satu folder yang sama.
+
+### Langkah 4: Pemasangan Library Pendukung (Dependencies)
+1. Buka folder tempat Anda mengekstrak program.
+2. Klik pada bilah alamat (address bar) di bagian atas Windows Explorer, ketik `cmd`, lalu tekan **Enter**. Ini akan membuka Command Prompt langsung di direktori program.
+3. Ketik perintah berikut di CMD lalu tekan **Enter**:
    ```bash
    pip install -r requirements.txt
    ```
+4. Tunggu hingga semua library selesai diunduh dan dipasang secara otomatis.
 
-3. **Buat File Konfigurasi**:
-   Salin file contoh konfigurasi menjadi file konfigurasi aktif:
-   * **Windows (PowerShell)**: `cp config.example.json config.json`
-   * **Windows (CMD)**: `copy config.example.json config.json`
-   * **Linux/macOS**: `cp config.example.json config.json`
+### Langkah 5: Menyiapkan File Konfigurasi
+1. Cari file bernama `config.example.json` di folder program.
+2. Salin (*Copy*) file tersebut dan ubah namanya (*Rename*) menjadi **`config.json`**.
+3. Buka file `config.json` menggunakan **Notepad** untuk mengonfigurasi provider email atau menyetel lisensi Anda.
 
 ---
 
-## 🛠️ Konfigurasi Provider Email
+## ⚙️ Konfigurasi Provider Email (di `config.json`)
 
-Buka file `config.json` menggunakan **Notepad** atau teks editor Anda untuk menyetel penyedia email sementara yang ingin Anda gunakan.
+Anda bisa memilih beberapa jenis penyedia email untuk digunakan mendaftar:
 
-### 1. Duckmail (Tanpa API Key)
-Opsi default yang paling praktis karena tidak memerlukan pendaftaran API Key apa pun.
-* **Cara setting di `config.json`**:
+### 1. Duckmail (Bawaan - Praktis)
+Tidak membutuhkan API Key atau pendaftaran apa pun. Langsung siap pakai.
+* **Pengaturan di `config.json`**:
   ```json
   "email_provider": "duckmail"
   ```
 
----
-
-### 2. YYDS Mail (Wajib API Key/JWT)
-Sangat stabil untuk pendaftaran massal. **Anda wajib memasukkan kunci API** agar tidak memicu error sistem.
-* **Cara setting di `config.json`**:
-  ```json
-  "email_provider": "yyds",
-  "yyds_api_key": "MASUKKAN_API_KEY_YYDS_ANDA_DI_SINI",
-  "yyds_jwt": ""
-  ```
-  *(Anda bisa mendapatkan API Key dari dasbor web `mail.215.im` atau bot Telegram resmi YYDS)*.
-
----
-
-### 3. Cloudflare Temp Mail / AyriMail (Temp Mail Pribadi)
-**Sangat Direkomendasikan!** Menggunakan domain kustom pribadi di Cloudflare Worker akan meningkatkan tingkat kesuksesan registrasi hingga mendekati **100%** karena domain Anda bersih dari blacklist sistem pendaftaran x.ai.
-
-* **Cara setting di `config.json` (Mode Anonim)**:
+### 2. Cloudflare Temp Mail / AyriMail (Sangat Direkomendasikan ⭐)
+Menggunakan domain kustom pribadi Anda di Cloudflare Worker. Tingkat kesuksesan pendaftaran mencapai **99%** karena domain bersih dari blokir sistem x.ai.
+* **Pengaturan di `config.json` (Mode Anonim)**:
   ```json
   "email_provider": "cloudflare",
-  "cloudflare_api_base": "https://domain-api-worker-anda.dev",
+  "cloudflare_api_base": "https://worker-domain-anda.dev",
   "cloudflare_api_key": "",
   "cloudflare_auth_mode": "none",
-  "cloudflare_path_domains": "/api/domains",
-  "cloudflare_path_accounts": "/api/new_address",
-  "cloudflare_path_token": "/api/token",
-  "cloudflare_path_messages": "/api/mails",
-  "defaultDomains": "domain-pribadi-anda.com"
-  ```
-* **Cara setting di `config.json` (Mode Admin)**:
-  Jika pembuatan email anonim Anda diproteksi Turnstile, gunakan jalur admin dengan password:
-  ```json
-  "email_provider": "cloudflare",
-  "cloudflare_api_base": "https://domain-api-worker-anda.dev",
-  "cloudflare_api_key": "PASSWORD_ADMIN_WORKER_ANDA",
-  "cloudflare_auth_mode": "x-admin-auth",
-  "cloudflare_path_accounts": "/admin/new_address",
   "defaultDomains": "domain-pribadi-anda.com"
   ```
 
 ---
 
-### 4. Mail.tm (Cadangan)
-Opsi cadangan bawaan.
-* **Cara setting di `config.json`**:
-  ```json
-  "email_provider": "mailtm"
-  ```
+## 💻 Cara Menjalankan Program
+
+Program ini mendukung dua cara pengoperasian:
+
+### A. Tampilan GUI (Visual - Mudah)
+Cara paling mudah untuk pengguna umum.
+1. Klik ganda langsung pada file **`grok_register_ttk.py`** di Windows Explorer, ATAU ketik di CMD:
+   ```bash
+   python grok_register_ttk.py
+   ```
+2. Pilih **Email Provider** pada menu drop-down.
+3. Tentukan **Jumlah Registrasi (Register Count)** dan jumlah tab berjalan (**Concurrent Count**).
+4. Klik tombol **Mulai (Start)**. Proses pendaftaran akan berjalan otomatis di browser Chrome.
+
+### B. Tampilan CLI (Terminal - Hemat Resource)
+Cocok untuk dijalankan pada Windows Server atau eksekusi pendaftaran massal tanpa grafis.
+1. Jalankan perintah ini di CMD:
+   ```bash
+   python grok_register_ttk.py cli
+   ```
+2. Ketik perintah `start` lalu tekan **Enter** setelah terminal siap.
+3. Tekan tombol `Ctrl + C` untuk menghentikan proses secara aman.
 
 ---
 
-## 💻 Cara Menjalankan Aplikasi
+## 🔍 Mengatasi Error yang Sering Terjadi (Troubleshooting)
 
-Aplikasi mendukung dua mode jalan: menggunakan tampilan visual (GUI) atau langsung dari terminal (CLI).
+#### ❓ Error: `ImportError: DLL load failed while importing grok_core`
+* **Solusi**:
+  1. Periksa kembali versi Python Anda dengan mengetik `python --version` di CMD. Pastikan hasilnya adalah **Python 3.14.x**. Jika bukan 3.14, hapus versi Python lama Anda dan instal ulang Python 3.14.3 melalui tautan di atas.
+  2. Pastikan Anda telah menginstal **Microsoft Visual C++ Redistributable** dan sudah merestart PC Anda.
 
-### A. Tampilan GUI (Sangat Direkomendasikan)
-Jalankan perintah berikut di CMD/Terminal, atau klik ganda langsung file `grok_register_ttk.py` di Windows Explorer:
-```bash
-python grok_register_ttk.py
-```
-* **Langkah Penggunaan**:
-  1. Pilih **Email Provider** yang diinginkan melalui menu drop-down di pojok kiri atas.
-  2. Isi jumlah registrasi di kolom **Jumlah Registrasi (Register Count)**.
-  3. Konfigurasikan proxy jika diperlukan di kolom **Proxy**.
-  4. Klik tombol **Mulai (Start)** untuk menjalankan otomatisasi.
-  5. Statistik sukses/gagal akan diperbarui secara real-time di layar.
-
-### B. Mode CLI (Tanpa Tampilan GUI)
-Cocok untuk dijalankan di server VPS atau eksekusi batch massal tanpa membuang resource grafis:
-```bash
-python grok_register_ttk.py cli
-```
-* Ketik perintah `start` di CMD setelah terminal siap untuk memulai.
-* Tekan `Ctrl + C` untuk menghentikan proses pendaftaran secara elegan.
-
-> [!TIP]
-> **Menjalankan di VPS Linux / Server Headless**:
-> Jika Anda menjalankan aplikasi ini di server Linux yang tidak memiliki GUI (desktop environment), pastikan Anda menyetel opsi berikut di file `config.json`:
-> * Ubah `"cpa_headless"` menjadi `true` agar browser berjalan sepenuhnya di latar belakang (*headless*).
-> * Jalankan aplikasi dengan mode CLI di atas.
+#### ❓ Error: `'python' is not recognized as an internal or external command`
+* **Solusi**: Anda lupa mencentang pilihan **"Add python.exe to PATH"** saat menginstal Python. Buka installer Python kembali, pilih opsi *Modify*, dan centang pilihan tersebut.
 
 ---
 
-## 💾 File Hasil Output
+## 💾 Lokasi File Hasil Pendaftaran
 
-Setelah pendaftaran berjalan sukses, file hasil berikut akan tersimpan otomatis di dalam folder aplikasi:
-* 📁 `accounts_*.txt` — Berisi daftar email, password, dan token SSO akun yang berhasil dibuat (Format: `email----password----SSO_Token`).
-* 📁 `cpa_auths/` — Folder yang berisi file konfigurasi kredensial CPA xAI dalam format JSON.
-* 📁 `mail_credentials.txt` — Berisi daftar kredensial email sementara yang pernah dibuat.
-
----
-
-## Fitur & Mekanisme Stabilitas
-
-* **Multi-Browser & Multi-Worker**: Mendukung pendaftaran paralel (`concurrent_count`) dengan profil browser yang saling terisolasi sepenuhnya.
-* **Auto-Restart Browser**: Browser akan otomatis direstart penuh setelah memproses setiap akun untuk mencegah kebocoran sesi SSO.
-* **Pembersihan Memori Otomatis**: Melakukan pembersihan memori runtime sistem secara berkala setelah berhasil mendaftarkan 5 akun.
-* **Penyimpanan Real-time**: Token sukses dan file CPA disimpan secara instan saat itu juga, sehingga aman meskipun program tiba-tiba ditutup.
-
----
-
-## Tanya Jawab (FAQ)
-
-#### Mengapa mode CLI masih membuka browser?
-Mode CLI hanya berarti tidak menampilkan jendela aplikasi GUI. Proses registrasi tetap membutuhkan browser Chromium nyata untuk memproses kode Turnstile, memuat halaman x.ai, dan memproses cookie pendaftaran secara akurat.
-
-#### Mengapa pendaftaran akun sering ditolak (rejected)?
-Layanan email publik gratis (seperti bawaan Duckmail, Mail.tm, atau YYDS publik) sering kali sudah masuk daftar hitam (*blacklist*) sistem x.ai karena pendaftaran massal oleh banyak pengguna lain. Solusi terbaik adalah menggunakan **Cloudflare Temp Email pribadi** dengan domain kustom Anda sendiri.
-
-#### Bagaimana cara mengubah tingkat log (log level)?
-Jika Anda ingin menyembunyikan pesan debug yang terlalu ramai, ubah `"log_level"` di `config.json`:
-* `"quiet"`: Hanya menampilkan pesan sukses/gagal, peringatan penting, dan kecepatan.
-* `"info"` (Rekomendasi): Menyembunyikan log diagnosa internal.
-* `"debug"`: Menampilkan seluruh alur eksekusi secara detail.
-
----
-
-## Struktur Direktori
-
-```text
-.
-├── grok_register_ttk.py   # Program Utama (GUI dan CLI Wrapper)
-├── grok_core.pyd          # Core Logic Engine (Modul Terkompilasi)
-├── cpa_export.py          # Script Ekspor CPA xAI
-├── cpa_xai/               # Modul backend CPA Mint & skema OAuth
-├── cf_mail_debug.py       # Diagnosa pengujian email Cloudflare
-├── config.example.json    # Templat file konfigurasi dasar
-├── requirements.txt       # Daftar dependensi library Python
-└── README.md              # File panduan ini
-```
-
-## Lisensi
-
-Didistribusikan di bawah Lisensi [MIT](LICENSE).
-
-
-
+Setelah bot berhasil membuat akun, data akan tersimpan langsung di folder aplikasi:
+* **`accounts_*.txt`** — Menyimpan hasil dalam format: `email----password----SSO_Token` (Format default ekspor).
+* **`tokens.txt`** — Hanya menyimpan daftar token akses SSO untuk keperluan integrasi API.
+* **`cpa_auths/`** — Folder berisi kredensial file CPA xAI dalam format JSON untuk digunakan langsung di 9Router.
