@@ -1,62 +1,221 @@
-{
-  "__comment_tempmail": "Jika menggunakan tempmail pribadi (Cloudflare/AyriMail), masukkan URL API dan API Key di parameter di bawah ini.",
-  "duckmail_api_key": "",
-  "cloudflare_api_base": "",
-  "cloudflare_api_key": "",
-  "cloudflare_auth_mode": "none",
-  "cloudflare_path_domains": "/api/domains",
-  "cloudflare_path_accounts": "/api/new_address",
-  "cloudflare_path_token": "/api/token",
-  "cloudflare_path_messages": "/api/mails",
-  "proxy": "",
-  "enable_nsfw": true,
-  "register_count": 1,
-  "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
-  "grok2api_auto_add_local": false,
-  "grok2api_local_token_file": "",
-  "grok2api_pool_name": "ssoBasic",
-  "grok2api_auto_add_remote": false,
-  "grok2api_remote_base": "",
-  "grok2api_remote_app_key": "",
-  "cpa_export_enabled": true,
-  "cpa_auth_dir": "cpa_auths",
-  "cpa_proxy": "",
-  "cpa_headless": false,
-  "cpa_probe_after_write": true,
-  "cpa_mint_timeout_sec": 240,
-  "cpa_base_url": "https://cli-chat-proxy.grok.com/v1",
-  "cpa_force_standalone": false,
-  "cpa_mint_cookie_inject": true,
-  "cpa_mint_browser_reuse": true,
-  "cpa_mint_browser_recycle_every": 15,
-  "cpa_hotload_dir": "",
-  "cpa_copy_to_hotload": false,
-  "cpa_server_host": "",
-  "cpa_server_user": "root",
-  "cpa_server_password": "",
-  "cpa_server_auth_dir": "",
-  "token_only_file": "",
-  "concurrent_count": 1,
-  "browser_restart_every": 10,
-  "cpa_mint_async": true,
-  "browser_use_custom_ua": false,
-  "license_key": "",
-  "license_activated_data": "",
-  "license_server_url": "",
-  "log_level": "info",
-  "speed_log_interval_sec": 60,
-  "defaultDomains": "",
-  "email_provider": "mailtm",
-  "ayrimail_api_base": "",
-  "ayrimail_api_key": "",
-  "ayrimail_domain": "",
-  "yyds_api_key": "",
-  "yyds_jwt": "",
-  "cpa_headers": {
-    "x-grok-client-version": "0.2.93",
-    "x-xai-token-auth": "xai-grok-cli",
-    "x-authenticateresponse": "authenticate-response",
-    "x-grok-client-identifier": "grok-shell",
-    "User-Agent": "grok-shell/0.2.93 (linux; x86_64)"
-  }
-}
+"""Register-machine hook: mint CPA xai auth after successful registration.
+
+OIDC package lives at ./cpa_xai (bundled with this project).
+Optional override: config `api_reverse_tools` / env `API_REVERSE_TOOLS`
+points at a directory that *contains* the `cpa_xai` package.
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+import sys
+import time
+from pathlib import Path
+from typing import Any, Callable
+
+_REG_DIR = Path(__file__).resolve().parent
+_DEFAULT_OUT = _REG_DIR / "cpa_auths"
+_DEFAULT_CPA = Path("")  # empty = do not assume a machine-local CPA path
+
+
+def _ensure_cpa_xai_on_path(tools_dir: str | Path | None = None) -> Path:
+    """Put the parent of `cpa_xai` on sys.path. Default: this project root."""
+    if tools_dir:
+        tools = Path(tools_dir).expanduser().resolve()
+    else:
+        env = (os.environ.get("API_REVERSE_TOOLS") or "").strip()
+        tools = Path(env).expanduser().resolve() if env else _REG_DIR
+    # If user pointed at .../cpa_xai itself, use its parent
+    if tools.name == "cpa_xai" and (tools / "__init__.py").is_file():
+        tools = tools.parent
+    if str(tools) not in sys.path:
+        sys.path.insert(0, str(tools))
+    return tools
+
+
+def export_cookies_from_page(page: Any) -> list[dict]:
+    """Best-effort export of cookies from a DrissionPage tab/browser."""
+    if page is None:
+        return []
+    cookies = None
+    for getter in (
+        lambda: page.cookies(all_domains=True, all_info=True),
+        lambda: page.cookies(all_domains=True),
+        lambda: page.cookies(),
+    ):
+        try:
+            cookies = getter()
+            if cookies:
+                break
+        except TypeError:
+            continue
+        except Exception:
+            continue
+    if not cookies:
+        try:
+            browser = getattr(page, "browser", None)
+            if browser is not None:
+                cookies = browser.cookies()
+        except Exception:
+            cookies = None
+    if isinstance(cookies, list):
+        return [c for c in cookies if isinstance(c, dict)]
+    return []
+
+
+def export_cpa_xai_for_account(
+    email: str,
+    password: str,
+    *,
+    page: Any | None = None,
+    cookies: Any | None = None,
+    sso: str | None = None,
+    config: dict | None = None,
+    log_callback: Callable[[str], None] | None = None,
+) -> dict:
+    """Mint OIDC + write xai-<email>.json under register cpa_auths (and optional CPA auth-dir)."""
+    cfg = config or {}
+    log = log_callback or (lambda m: print(m, flush=True))
+
+    if not cfg.get("cpa_export_enabled", True):
+        log("[cpa] export disabled")
+        return {"ok": False, "skipped": True, "reason": "disabled"}
+
+    tools_dir = cfg.get("api_reverse_tools") or cfg.get("cpa_xai_parent") or None
+    _ensure_cpa_xai_on_path(tools_dir)
+
+    try:
+        from cpa_xai import mint_and_export  # type: ignore
+    except Exception as e:  # noqa: BLE001
+        log(f"[cpa] import cpa_xai failed: {e}")
+        return {"ok": False, "error": f"import: {e}"}
+
+    out_dir = Path(cfg.get("cpa_auth_dir") or _DEFAULT_OUT).expanduser()
+    if not out_dir.is_absolute():
+        out_dir = (_REG_DIR / out_dir).resolve()
+
+    hotload_raw = (cfg.get("cpa_hotload_dir") or "").strip()
+    cpa_dir = Path(hotload_raw).expanduser() if hotload_raw else None
+    if cpa_dir and not cpa_dir.is_absolute():
+        cpa_dir = (_REG_DIR / cpa_dir).resolve()
+
+    # Priority: cpa_proxy > proxy > env. Config must beat shell https_proxy.
+    proxy = (cfg.get("cpa_proxy") or cfg.get("proxy") or "").strip()
+    if not proxy:
+        proxy = (
+            os.environ.get("https_proxy")
+            or os.environ.get("HTTPS_PROXY")
+            or os.environ.get("http_proxy")
+            or ""
+        ).strip()
+    # Default headed: headless is frequently Cloudflare-blocked on accounts.x.ai
+    headless = bool(cfg.get("cpa_headless", False))
+    probe = bool(cfg.get("cpa_probe_after_write", False))
+    probe_chat = bool(cfg.get("cpa_probe_chat", False))
+    timeout = float(cfg.get("cpa_mint_timeout_sec", 240))
+    base_url = cfg.get("cpa_base_url") or "https://cli-chat-proxy.grok.com/v1"
+    cpa_headers = cfg.get("cpa_headers") or None
+    force_standalone = bool(cfg.get("cpa_force_standalone", False))
+    cookie_inject = bool(cfg.get("cpa_mint_cookie_inject", True))
+    reuse_browser = bool(cfg.get("cpa_mint_browser_reuse", True))
+    recycle_every = int(cfg.get("cpa_mint_browser_recycle_every", 15) or 0)
+
+    reuse_page = None if force_standalone else page
+
+    # cookies: explicit arg > page export > none
+    # When reusing registration browser, skip cookie injection (already logged in)
+    use_cookies = None
+    if reuse_page is None:
+        use_cookies = cookies
+        if use_cookies is None and cookie_inject and page is not None:
+            use_cookies = export_cookies_from_page(page)
+        if not cookie_inject:
+            use_cookies = None
+        else:
+            sso_val = (sso or "").strip()
+            if not sso_val and isinstance(use_cookies, list):
+                for c in use_cookies:
+                    if isinstance(c, dict) and c.get("name") in ("sso", "sso-rw") and c.get("value"):
+                        sso_val = str(c.get("value"))
+                        break
+            if sso_val:
+                base = list(use_cookies) if isinstance(use_cookies, list) else []
+                for name in ("sso", "sso-rw"):
+                    for dom in (".x.ai", "accounts.x.ai", ".accounts.x.ai", "grok.com", ".grok.com"):
+                        base.append({
+                            "name": name,
+                            "value": sso_val,
+                            "domain": dom,
+                            "path": "/",
+                            "secure": True,
+                            "httpOnly": True,
+                        })
+                use_cookies = base
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    log(
+        f"[cpa] mint OIDC for {email} -> {out_dir} proxy={proxy or '(none)'} "
+        f"cookies={len(use_cookies) if isinstance(use_cookies, list) else (1 if use_cookies else 0)} "
+        f"reuse={reuse_browser}"
+    )
+
+    def _log(msg: str) -> None:
+        log(f"[cpa] {msg}")
+
+    result = mint_and_export(
+        email=email,
+        password=password,
+        auth_dir=out_dir,
+        page=reuse_page,
+        proxy=proxy or None,
+        headless=headless,
+        base_url=base_url,
+        headers=cpa_headers,
+        probe=probe,
+        probe_chat=probe_chat,
+        browser_timeout_sec=timeout,
+        force_standalone=force_standalone,
+        cookies=use_cookies,
+        reuse_browser=reuse_browser,
+        recycle_every=recycle_every,
+        log=_log,
+    )
+
+    # Navigate registration browser back to blank after reuse
+    if reuse_page is not None:
+        try:
+            reuse_page.get("about:blank")
+        except Exception:
+            pass
+
+    if result.get("ok") and result.get("path") and cfg.get("cpa_copy_to_hotload", False) and cpa_dir:
+        try:
+            cpa_dir.mkdir(parents=True, exist_ok=True)
+            src = Path(result["path"])
+            dst = cpa_dir / src.name
+            shutil.copy2(src, dst)
+            os.chmod(dst, 0o600)
+            result["cpa_path"] = str(dst)
+            log(f"[cpa] hotload copy -> {dst}")
+        except Exception as e:  # noqa: BLE001
+            log(f"[cpa] hotload copy failed: {e}")
+            result["cpa_copy_error"] = str(e)
+
+    if result.get("ok") and result.get("path") and cfg.get("cpa_server_host"):
+        try:
+            from grok_register_ttk import upload_to_cpa_server
+            upload_to_cpa_server(result["path"], log_callback=log)
+        except Exception as e:  # noqa: BLE001
+            log(f"[cpa] server upload failed: {e}")
+            result["upload_error"] = str(e)
+
+    # failure log under register dir
+    if not result.get("ok"):
+        fail_path = out_dir / "cpa_auth_failed.txt"
+        with open(fail_path, "a", encoding="utf-8") as f:
+            f.write(f"{email}----{result.get('error') or 'unknown'}----{int(time.time())}\n")
+        if cfg.get("cpa_mint_required", False):
+            raise RuntimeError(f"CPA mint required but failed: {result.get('error')}")
+
+    return result
