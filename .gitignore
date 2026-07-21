@@ -25,3 +25,15 @@ config.local.json
 DrissionPage/
 autoPortData/
 .browser_profiles/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
+wrangler.json
+wrangler.jsonc
+license_worker.js
+bulk_licenses_kv.json
+block_bulk.json
