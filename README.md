@@ -18,10 +18,9 @@ Grok Register adalah sebuah alat registrasi otomatis Python yang ditujukan untuk
 > Proyek ini hanya digunakan untuk penelitian alur otomatisasi, verifikasi lingkungan pengujian, dan pembelajaran pribadi. Harap patuhi ketentuan layanan situs web target, hukum dan peraturan setempat, serta batasan layanan pihak ketiga.
 
 > [!NOTE]
-> **Transparansi & Keamanan Kode**:
-> Untuk menjamin keamanan 100% dan transparansi bagi semua pengguna, bagian inti program ini (**`grok_core.py`**) disajikan dalam bentuk **source code Python terbuka (bukan file terkompilasi `.pyd`)**.
-> Hal ini memastikan bahwa program ini bebas dari salah deteksi antivirus (*false positives*) dan Anda dapat memeriksa seluruh alur kode secara mandiri.
-> Semua data hasil pendaftaran disimpan secara lokal di perangkat Anda (dalam file `accounts_*.txt` dan `tokens.txt`). Tidak ada pengiriman data ke server pihak ketiga mana pun.
+> **Keamanan & Privasi Data**:
+> Bagian inti program ini (**`grok_core.pyd`**) didistribusikan dalam bentuk **modul terkompilasi** untuk menjaga keamanan dan integritas sistem lisensi.
+> Semua data hasil pendaftaran disimpan **100% secara lokal** di perangkat Anda (dalam file `accounts_*.txt` dan `tokens.txt`). Tidak ada pengiriman data ke server pihak ketiga mana pun.
 
 ## 📋 Daftar Isi
 
@@ -215,7 +214,7 @@ Jika Anda ingin menyembunyikan pesan debug yang terlalu ramai, ubah `"log_level"
 ```text
 .
 ├── grok_register_ttk.py   # Program Utama (GUI dan CLI Wrapper)
-├── grok_core.py           # Core Logic Engine (Source Code Terbuka & Universal)
+├── grok_core.pyd          # Core Logic Engine (Modul Terkompilasi)
 ├── cpa_export.py          # Script Ekspor CPA xAI
 ├── cpa_xai/               # Modul backend CPA Mint & skema OAuth
 ├── cf_mail_debug.py       # Diagnosa pengujian email Cloudflare
