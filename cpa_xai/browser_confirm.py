@@ -176,7 +176,9 @@ def create_standalone_page(
                 from grok_register_ttk import create_browser_options  # type: ignore
 
                 opts = create_browser_options()
-                log("using register create_browser_options (turnstilePatch)")
+                if opts is not None:
+                    opts.auto_port()
+                log("using register create_browser_options (turnstilePatch) with auto_port")
             except Exception as e:  # noqa: BLE001
                 log(f"register browser options unavailable: {e}")
                 opts = None
