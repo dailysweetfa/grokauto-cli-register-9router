@@ -13,7 +13,19 @@
   <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License: MIT">
 </p>
 
+<p align="center">
+  <a href="https://store.ayricreative.com/produk/grok-auto-register-apikey">
+    <img src="https://img.shields.io/badge/🛒%20Beli%20Lisensi%20Resmi-Ayri%20Creative%20Store-10b981?style=for-the-badge&logo=shopping-bag" alt="Beli Lisensi Resmi">
+  </a>
+</p>
+
 </div>
+
+---
+
+### 🔑 Pembelian Lisensi Resmi
+Untuk mendapatkan kunci lisensi aktivasi program ini, silakan melakukan pembelian secara resmi melalui tautan Store berikut:
+👉 **[https://store.ayricreative.com/produk/grok-auto-register-apikey](https://store.ayricreative.com/produk/grok-auto-register-apikey)**
 
 ---
 
