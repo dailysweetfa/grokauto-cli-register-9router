@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/Python-3.14-3776AB.svg?style=flat-square&logo=python" alt="Python 3.14">
   <img src="https://img.shields.io/badge/OS-Windows-0078D6.svg?style=flat-square&logo=windows" alt="Windows Only">
   <img src="https://img.shields.io/badge/Interface-GUI%20%2B%20CLI-success.svg?style=flat-square" alt="GUI + CLI">
-  <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License: MIT">
+  <a href="https://www.threads.net/@dailysweet.fa"><img src="https://img.shields.io/badge/Threads-@dailysweet.fa-black.svg?style=flat-square&logo=threads" alt="Threads @dailysweet.fa"></a>
 </p>
 
 <p align="center">
