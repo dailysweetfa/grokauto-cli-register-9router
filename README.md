@@ -97,18 +97,21 @@ Ikuti langkah-langkah mudah berikut dari awal sampai siap pakai:
 
 ## ⚙️ Konfigurasi Provider Email (di `config.json`)
 
-Anda bisa memilih beberapa jenis penyedia email untuk digunakan mendaftar:
+Program ini hanya mendukung 2 penyedia email berkualitas tinggi untuk tingkat keberhasilan pendaftaran maksimal:
 
-### 1. Duckmail (Bawaan - Praktis)
-Tidak membutuhkan API Key atau pendaftaran apa pun. Langsung siap pakai.
+### 1. AyriMail (Bawaan - Direkomendasikan ⭐)
+Provider email berkecepatan tinggi yang dirancang khusus untuk registrasi akun Grok/xAI.
 * **Pengaturan di `config.json`**:
   ```json
-  "email_provider": "duckmail"
+  "email_provider": "ayrimail",
+  "ayrimail_api_base": "https://app.ayrimail.web.id",
+  "ayrimail_api_key": "API_KEY_ANDA",
+  "ayrimail_domain": "random"
   ```
 
-### 2. Cloudflare Temp Mail / AyriMail (Sangat Direkomendasikan ⭐)
+### 2. Temp Mail Pribadi (Cloudflare Worker)
 Menggunakan domain kustom pribadi Anda di Cloudflare Worker. Tingkat kesuksesan pendaftaran mencapai **99%** karena domain bersih dari blokir sistem x.ai.
-* **Pengaturan di `config.json` (Mode Anonim)**:
+* **Pengaturan di `config.json`**:
   ```json
   "email_provider": "cloudflare",
   "cloudflare_api_base": "https://worker-domain-anda.dev",

@@ -1,6 +1,9 @@
 {
-  "__comment_tempmail": "Jika menggunakan tempmail pribadi (Cloudflare/AyriMail), masukkan URL API dan API Key di parameter di bawah ini.",
-  "duckmail_api_key": "",
+  "__comment_email": "Pilihan email_provider: 'ayrimail' (default) atau 'cloudflare' (Temp Mail Pribadi).",
+  "email_provider": "ayrimail",
+  "ayrimail_api_base": "",
+  "ayrimail_api_key": "",
+  "ayrimail_domain": "random",
   "cloudflare_api_base": "",
   "cloudflare_api_key": "",
   "cloudflare_auth_mode": "none",
@@ -40,10 +43,6 @@
   "browser_restart_every": 10,
   "cpa_mint_async": true,
   "browser_use_custom_ua": false,
-  "email_provider": "ayrimail",
-  "ayrimail_api_base": "",
-  "ayrimail_api_key": "",
-  "ayrimail_domain": "random",
   "ROUTER9_URL": "http://localhost:20128",
   "ROUTER9_PASS": ""
 }
