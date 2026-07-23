@@ -1007,18 +1007,13 @@ class GrokRegisterGUI:
                     finally:
                         local_attempts += 1
                         self.update_stats()
+                        try:
+                            restart_browser(log_callback=log_fn)
+                        except Exception:
+                            pass
+                        sleep_with_cancel(1, self.should_stop)
                     if self.should_stop():
                         break
-                        # Konsisten dengan versi stabil/single worker: restart penuh setiap akun, menghindari sisa sesi SSO/TOS masuk ke tos-gate
-                        if _get_browser() is None:
-                            start_browser(log_callback=log_fn)
-                        else:
-                            if restart_every > 0 and local_attempts % restart_every == 0:
-                                log_fn(
-                                    f"[*] Worker-{worker_id} Telah memproses {local_attempts} akun, merestart browser secara berkala"
-                                )
-                            restart_browser(log_callback=log_fn)
-                        sleep_with_cancel(1, self.should_stop)
         finally:
             stop_browser()
 

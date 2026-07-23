@@ -107,6 +107,22 @@ Menggunakan domain kustom pribadi Anda di Cloudflare Worker. Tingkat kesuksesan 
 
 ---
 
+## 🔌 Integrasi Otomatis ke 9Router (Opsional)
+
+Jika customer/pengguna Anda menggunakan aplikasi **9Router** untuk mengelola koneksi Grok/xAI, bot dapat menyinkronkan dan menguji akun baru secara otomatis:
+
+1. Buka file `config.json`.
+2. Masukkan URL dan Password 9Router masing-masing pengguna pada bagian:
+   ```json
+   "ROUTER9_URL": "http://localhost:20128",
+   "ROUTER9_PASS": "kata_sandi_9router_pengguna"
+   ```
+3. **Fitur Otomatis 9Router**:
+   - **Sinkronisasi Otomatis**: Setiap kali pendaftaran 1 akun selesai, biner token akan langsung masuk ke database 9Router lokal.
+   - **Auto-Cleanup Error**: Bot akan secara otomatis mendeteksi dan menghapus akun mati (`401` / `402`) serta mereset status `403` / `429` menjadi `success` di 9Router tanpa perlu penanganan manual.
+
+---
+
 ## 💻 Cara Menjalankan Program
 
 Program ini mendukung dua cara pengoperasian:
