@@ -250,12 +250,28 @@ class GrokRegisterGUI:
         hwid = get_hwid()
         tk.Label(
             self.root,
-            text=f"Silakan hubungi @dailysweet.fa untuk lisensi Anda.\nHardware ID Perangkat Anda: {hwid}",
+            text=f"Silakan hubungi @dailysweet.fa atau beli lisensi resmi di:\nhttps://store.ayricreative.com/produk/grok-auto-register-apikey\n\nHardware ID Perangkat Anda: {hwid}",
             font=label_font,
             bg="#f1f5f9",
             fg="#64748b",
             justify=tk.CENTER
-        ).pack(pady=(0, 15))
+        ).pack(pady=(0, 10))
+
+        import webbrowser
+        btn_buy = tk.Button(
+            self.root,
+            text="🛒 Beli Lisensi Resmi di Store",
+            command=lambda: webbrowser.open("https://store.ayricreative.com/produk/grok-auto-register-apikey"),
+            bg="#10b981",
+            fg="#ffffff",
+            font=("Segoe UI Semibold", 9),
+            relief=tk.FLAT,
+            bd=0,
+            padx=10,
+            pady=4,
+            cursor="hand2"
+        )
+        btn_buy.pack(pady=(0, 15))
         
         entry_frame = tk.Frame(self.root, bg="#f1f5f9")
         entry_frame.pack(fill=tk.X, padx=40, pady=5)
@@ -544,7 +560,23 @@ class GrokRegisterGUI:
             font=("Segoe UI Semibold", 10),
             fg="#e2e8f0",
             bg=THEME_SIDEBAR_CARD,
-        ).pack(anchor=tk.W, pady=(2, 0))
+        ).pack(anchor=tk.W, pady=(2, 4))
+
+        import webbrowser
+        btn_buy_sidebar = tk.Button(
+            license_card,
+            text="🛒 Beli Lisensi di Store",
+            command=lambda: webbrowser.open("https://store.ayricreative.com/produk/grok-auto-register-apikey"),
+            bg="#10b981",
+            fg="#ffffff",
+            font=("Segoe UI Semibold", 8),
+            relief=tk.FLAT,
+            bd=0,
+            padx=6,
+            pady=2,
+            cursor="hand2"
+        )
+        btn_buy_sidebar.pack(anchor=tk.W, pady=(2, 0))
 
 
         # 2. Main Content Area
@@ -586,8 +618,8 @@ class GrokRegisterGUI:
 
         # C1 Fields
         add_c1_label(1, "Penyedia Email:")
-        self.email_provider_var = tk.StringVar(value=config.get("email_provider", "mailtm"))
-        self.email_provider_combo = tk_option_menu(card1, self.email_provider_var, ["duckmail", "yyds", "cloudflare", "mailtm"], width=12)
+        self.email_provider_var = tk.StringVar(value=config.get("email_provider", "ayrimail"))
+        self.email_provider_combo = tk_option_menu(card1, self.email_provider_var, ["ayrimail", "cloudflare"], width=12)
         add_c1_field(self.email_provider_combo, 1)
 
         add_c1_label(2, "Jumlah Registrasi:")
@@ -618,29 +650,24 @@ class GrokRegisterGUI:
         self.proxy_entry = tk_entry(card1, textvariable=self.proxy_var, width=24)
         add_c1_field(self.proxy_entry, 3)
 
-        add_c1_label(4, "DuckMail API Key:")
-        self.api_key_var = tk.StringVar(value=config.get("duckmail_api_key", ""))
-        self.api_key_entry = tk_entry(card1, textvariable=self.api_key_var, width=24)
-        add_c1_field(self.api_key_entry, 4)
-
-        add_c1_label(5, "Mode Autentikasi CF:")
+        add_c1_label(4, "Mode Autentikasi CF:")
         self.cloudflare_auth_mode_var = tk.StringVar(value=config.get("cloudflare_auth_mode", "none"))
         self.cloudflare_auth_mode_combo = tk_option_menu(
             card1, self.cloudflare_auth_mode_var, ["query-key", "bearer", "x-api-key", "x-admin-auth", "none"], width=12
         )
-        add_c1_field(self.cloudflare_auth_mode_combo, 5)
+        add_c1_field(self.cloudflare_auth_mode_combo, 4)
 
-        add_c1_label(6, "Cloudflare API Base:")
+        add_c1_label(5, "Cloudflare API Base:")
         self.cloudflare_api_base_var = tk.StringVar(value=config.get("cloudflare_api_base", ""))
         self.cloudflare_api_base_entry = tk_entry(card1, textvariable=self.cloudflare_api_base_var, width=24)
-        add_c1_field(self.cloudflare_api_base_entry, 6)
+        add_c1_field(self.cloudflare_api_base_entry, 5)
 
-        add_c1_label(7, "Cloudflare API Key:")
+        add_c1_label(6, "Cloudflare API Key:")
         self.cloudflare_api_key_var = tk.StringVar(value=config.get("cloudflare_api_key", ""))
         self.cloudflare_api_key_entry = tk_entry(card1, textvariable=self.cloudflare_api_key_var, width=24)
-        add_c1_field(self.cloudflare_api_key_entry, 7)
+        add_c1_field(self.cloudflare_api_key_entry, 6)
 
-        add_c1_label(8, "Jalur CF:")
+        add_c1_label(7, "Jalur CF:")
         self.cloudflare_paths_var = tk.StringVar(
             value=",".join(
                 [
@@ -652,7 +679,7 @@ class GrokRegisterGUI:
             )
         )
         self.cloudflare_paths_entry = tk_entry(card1, textvariable=self.cloudflare_paths_var, width=24)
-        add_c1_field(self.cloudflare_paths_entry, 8)
+        add_c1_field(self.cloudflare_paths_entry, 7)
 
 
         # CARD 2: grok2api & Pool
@@ -691,9 +718,9 @@ class GrokRegisterGUI:
         add_c2_field(self.grok2api_local_auto_check, 1)
 
         add_c2_label(2, "Nama Pool grok2api:")
-        self.grok2api_pool_name_var = tk.StringVar(value=str(config.get("grok2api_pool_name", "ssoBasic")))
+        self.grok2api_pool_name_var = tk.StringVar(value="ssoBasic")
         self.grok2api_pool_name_combo = tk_option_menu(
-            card2, self.grok2api_pool_name_var, ["ssoBasic", "ssoSuper"], width=12
+            card2, self.grok2api_pool_name_var, ["ssoBasic"], width=12
         )
         add_c2_field(self.grok2api_pool_name_combo, 2)
 
@@ -841,10 +868,9 @@ class GrokRegisterGUI:
             self.log("[!] Ada tugas lain yang sedang berjalan")
             return
 
-        config["email_provider"] = self.email_provider_var.get().strip() or "duckmail"
+        config["email_provider"] = self.email_provider_var.get().strip() or "ayrimail"
         config["enable_nsfw"] = bool(self.nsfw_var.get())
         config["proxy"] = self.proxy_var.get().strip()
-        config["duckmail_api_key"] = self.api_key_var.get().strip()
         config["cloudflare_api_base"] = self.cloudflare_api_base_var.get().strip()
         config["cloudflare_api_key"] = self.cloudflare_api_key_var.get().strip()
         config["cloudflare_auth_mode"] = self.cloudflare_auth_mode_var.get().strip() or "none"
