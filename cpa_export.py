@@ -10,10 +10,12 @@ from __future__ import annotations
 import os
 import shutil
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Any, Callable
 
+_CPA_MINT_LOCK = threading.Lock()
 _REG_DIR = Path(__file__).resolve().parent
 _DEFAULT_OUT = _REG_DIR / "cpa_auths"
 _DEFAULT_CPA = Path("")  # empty = do not assume a machine-local CPA path
@@ -163,24 +165,25 @@ def export_cpa_xai_for_account(
     def _log(msg: str) -> None:
         log(f"[cpa] {msg}")
 
-    result = mint_and_export(
-        email=email,
-        password=password,
-        auth_dir=out_dir,
-        page=reuse_page,
-        proxy=proxy or None,
-        headless=headless,
-        base_url=base_url,
-        headers=cpa_headers,
-        probe=probe,
-        probe_chat=probe_chat,
-        browser_timeout_sec=timeout,
-        force_standalone=force_standalone,
-        cookies=use_cookies,
-        reuse_browser=reuse_browser,
-        recycle_every=recycle_every,
-        log=_log,
-    )
+    with _CPA_MINT_LOCK:
+        result = mint_and_export(
+            email=email,
+            password=password,
+            auth_dir=out_dir,
+            page=reuse_page,
+            proxy=proxy or None,
+            headless=headless,
+            base_url=base_url,
+            headers=cpa_headers,
+            probe=probe,
+            probe_chat=probe_chat,
+            browser_timeout_sec=timeout,
+            force_standalone=force_standalone,
+            cookies=use_cookies,
+            reuse_browser=reuse_browser,
+            recycle_every=recycle_every,
+            log=_log,
+        )
 
     # Navigate registration browser back to blank after reuse
     if reuse_page is not None:
