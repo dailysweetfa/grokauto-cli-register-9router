@@ -4,7 +4,7 @@
 
 [![Grok Register — GUI and CLI registration automation toolkit](assets/banner.png)](https://github.com/AaronL725/grok-register)
 
-**Grok Register** adalah alat otomatisasi pendaftaran akun Grok (x.ai) berbasis Python yang mendukung antarmuka visual (**GUI**) maupun terminal (**CLI**). Dilengkapi dengan penanganan Cloudflare Turnstile, dukungan email sementara, dan integrasi otomatis ke pool **9Router**.
+**Grok Register** adalah alat otomatisasi pendaftaran akun Grok (x.ai) berbasis Python yang mendukung antarmuka visual (**GUI**) maupun terminal (**CLI**). Dilengkapi dengan penanganan Cloudflare Turnstile, dukungan email sementara, serta ekspor akun & token otomatis.
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.14-3776AB.svg?style=flat-square&logo=python" alt="Python 3.14">
@@ -51,7 +51,7 @@ Untuk mendapatkan kunci lisensi aktivasi program ini, silakan melakukan pembelia
   * **GUI Visual**: Tampilan antarmuka grafis Tkinter/TTK yang modern dan mudah digunakan.
   * **CLI Terminal**: Mode eksekusi terminal hemat *resource* yang cocok untuk Windows Server.
 * 🔌 **Integrasi 9Router Proxy (Fitur Opsional / Tambahan)**:
-  * Fitur ekspor CPA / OIDC ke 9Router bersifat **opsional (fitur tambahan)**. Pendaftaran akun utama dan ekspor file `accounts_*.txt` tetap berjalan normal 100% secara mandiri.
+  * Mendukung ekspor otomatis token OIDC ke database 9Router sebagai opsi fitur tambahan. Pendaftaran akun utama dan ekspor file `accounts_*.txt` tetap berjalan secara mandiri.
 
 ---
 
@@ -142,10 +142,10 @@ Menggunakan domain kustom pribadi Anda di Cloudflare Worker. Tingkat kesuksesan 
 
 ---
 
-## 🔌 Integrasi Otomatis ke 9Router (Opsional / Tambahan)
+## 🔌 Integrasi Otomatis ke 9Router (Fitur Opsional)
 
 > [!NOTE]
-> **Catatan Fitur Opsional**: Otomatisasi pendaftaran akun Grok/xAI dan ekspor file `accounts_*.txt` / `tokens.txt` adalah **fitur utama** yang berjalan 100% normal secara mandiri. Integrasi ekspor OIDC ke 9Router bersifat **opsional (fitur tambahan)** bagi pengguna yang ingin menyinkronkan token secara opsional.
+> **Catatan Fitur Opsional**: Otomatisasi pendaftaran akun Grok/xAI dan ekspor file `accounts_*.txt` / `tokens.txt` adalah **fitur utama** aplikasi. Integrasi ekspor OIDC ke 9Router disediakan sebagai fitur opsional tambahan bagi pengguna yang ingin menyinkronkan token ke aplikasi 9Router.
 
 Jika customer/pengguna Anda menggunakan aplikasi **9Router** untuk mengelola koneksi Grok/xAI, bot menyediakan opsi integrasi ke 9Router:
 
@@ -157,7 +157,7 @@ Jika customer/pengguna Anda menggunakan aplikasi **9Router** untuk mengelola kon
    ```
 3. **Pengaturan Fitur Opsional**:
    - Jika fitur `cpa_export_enabled` disetel ke `true` di `config.json`, bot akan mencoba menyinkronkan token OIDC ke database 9Router.
-   - Jika disetel ke `false`, registrasi akun utama tetap berjalan penuh 100% tanpa hambatan.
+   - Jika disetel ke `false`, registrasi akun utama tetap berjalan secara mandiri tanpa terpengaruh.
 
 ---
 
