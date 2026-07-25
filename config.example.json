@@ -1,8 +1,8 @@
 {
-  "__comment_email": "Pilihan email_provider: 'ayrimail' (default) atau 'cloudflare' (Temp Mail Pribadi).",
+  "__comment_email": "Pilihan email_provider: 'ayrimail' (default) atau 'cloudflare'. Pilihan ayrimail_domain: 'random', 'canvaisme.web.id', atau 'mascara.biz.id'.",
   "email_provider": "ayrimail",
-  "ayrimail_api_base": "",
-  "ayrimail_api_key": "",
+  "ayrimail_api_base": "https://app.ayrimail.web.id",
+  "ayrimail_api_key": "MASUKKAN_API_KEY_AYRIMAIL_CUSTOMER",
   "ayrimail_domain": "random",
   "cloudflare_api_base": "",
   "cloudflare_api_key": "",
