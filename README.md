@@ -31,27 +31,27 @@ Untuk mendapatkan kunci lisensi aktivasi program ini, silakan melakukan pembelia
 
 ## ✨ FITUR-FITUR UNGGULAN (KEY FEATURES)
 
-* 🤖 **Otomatisasi Registrasi Grok/xAI 100% Autopilot**:
+* 🤖 **Otomatisasi Registrasi Grok/xAI 100% Autopilot (Fitur Utama)**:
   Pengisian nama, pembentukan kata sandi acak yang kuat, pendaftaran alamat email, hingga verifikasi kode OTP dilakukan secara otomatis tanpa campur tangan manual.
 * 🛡️ **Penanganan Cloudflare Turnstile Cerdas (Auto-Solve & Auto-Click)**:
   Sistem penanganan berbasis token Turnstile yang secara otomatis mendeteksi dan mengeklik kotak centang `[ ] Verify you are human` dalam jeda 2 detik jika verifikasi tertahan.
 * ⚡ **Dukungan Multi-Worker Paralel (Multi-Threading)**:
   Mendukung pendaftaran massal secara bersamaan (*Concurrent Workers*) untuk menghasilkan puluhan hingga ratusan akun dalam waktu singkat.
-* 🔌 **Integrasi Otomatis & Re-Autentikasi 9Router Proxy**:
-  * **Sinkronisasi Langsung**: Setiap akun baru yang terbentuk otomatis dimasukkan ke database SQLite 9Router (`data.sqlite`).
-  * **Auto Re-Authentication**: Re-autentikasi otomatis OAuth refresh token setiap kali aplikasi dibuka agar koneksi 9Router selalu segar (*fresh*).
-  * **Auto-Cleanup Error**: Pembersihan otomatis akun kadaluarsa (`401` / `402`) dan reset status tertahan (`403` / `429`).
 * 📧 **Dukungan Email Provider Berkualitas Tinggi**:
   * **AyriMail**: Provider email cepat bawaan yang dirancang khusus untuk registrasi xAI.
   * **Temp Mail Pribadi (Cloudflare Worker)**: Pemrosesan domain pribadi Cloudflare Worker dengan parser OTP serbaguna yang mengenali 100% format email xAI.
+* 🌶️ **Aktivasi NSFW Otomatis**:
+  Opsi pengaktifan pengaturan NSFW pada profil akun Grok secara otomatis setelah pendaftaran selesai.
+* 💾 **Ekspor Akun & Token Otomatis**:
+  Menyimpan hasil pendaftaran langsung ke file `accounts_*.txt` (`email----password----SSO_Token`) dan `tokens.txt`.
 * 🔒 **Proteksi Biner Mesin & Lisensi Kriptografi**:
   * Modul utama terkompilasi ke biner C-Extension (`grok_core.pyd`) yang aman dari dekompilasi.
   * Otentikasi lisensi terikat **Hardware ID (HWID)**, stempel digital HMAC-SHA256, dan proteksi anti-manipulasi jam sistem (*Anti-Clock Rollback*).
 * 🖥️ **Antarmuka Ganda (GUI Visual + CLI Terminal)**:
   * **GUI Visual**: Tampilan antarmuka grafis Tkinter/TTK yang modern dan mudah digunakan.
   * **CLI Terminal**: Mode eksekusi terminal hemat *resource* yang cocok untuk Windows Server.
-* 🌶️ **Aktivasi NSFW Otomatis**:
-  Opsi pengaktifan pengaturan NSFW pada profil akun Grok secara otomatis setelah pendaftaran selesai.
+* 🔌 **Integrasi 9Router Proxy (Fitur Opsional / Tambahan)**:
+  * Fitur ekspor CPA / OIDC ke 9Router bersifat **opsional (fitur tambahan)**. Pendaftaran akun utama dan ekspor file `accounts_*.txt` tetap berjalan normal 100% secara mandiri.
 
 ---
 
@@ -142,9 +142,12 @@ Menggunakan domain kustom pribadi Anda di Cloudflare Worker. Tingkat kesuksesan 
 
 ---
 
-## 🔌 Integrasi Otomatis ke 9Router (Opsional)
+## 🔌 Integrasi Otomatis ke 9Router (Opsional / Tambahan)
 
-Jika customer/pengguna Anda menggunakan aplikasi **9Router** untuk mengelola koneksi Grok/xAI, bot dapat menyinkronkan dan menguji akun baru secara otomatis:
+> [!NOTE]
+> **Catatan Fitur Opsional**: Otomatisasi pendaftaran akun Grok/xAI dan ekspor file `accounts_*.txt` / `tokens.txt` adalah **fitur utama** yang berjalan 100% normal secara mandiri. Integrasi ekspor OIDC ke 9Router bersifat **opsional (fitur tambahan)** bagi pengguna yang ingin menyinkronkan token secara opsional.
+
+Jika customer/pengguna Anda menggunakan aplikasi **9Router** untuk mengelola koneksi Grok/xAI, bot menyediakan opsi integrasi ke 9Router:
 
 1. Buka file `config.json`.
 2. Masukkan URL dan Password 9Router masing-masing pengguna pada bagian:
@@ -152,9 +155,9 @@ Jika customer/pengguna Anda menggunakan aplikasi **9Router** untuk mengelola kon
    "ROUTER9_URL": "http://localhost:20128",
    "ROUTER9_PASS": "kata_sandi_9router_pengguna"
    ```
-3. **Fitur Otomatis 9Router**:
-   - **Sinkronisasi Otomatis**: Setiap kali pendaftaran 1 akun selesai, biner token akan langsung masuk ke database 9Router lokal.
-   - **Auto-Cleanup Error**: Bot akan secara otomatis mendeteksi dan menghapus akun mati (`401` / `402`) serta mereset status `403` / `429` menjadi `success` di 9Router tanpa perlu penanganan manual.
+3. **Pengaturan Fitur Opsional**:
+   - Jika fitur `cpa_export_enabled` disetel ke `true` di `config.json`, bot akan mencoba menyinkronkan token OIDC ke database 9Router.
+   - Jika disetel ke `false`, registrasi akun utama tetap berjalan penuh 100% tanpa hambatan.
 
 ---
 
