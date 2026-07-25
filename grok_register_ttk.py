@@ -654,24 +654,36 @@ class GrokRegisterGUI:
         self.proxy_entry = tk_entry(card1, textvariable=self.proxy_var, width=24)
         add_c1_field(self.proxy_entry, 3)
 
-        add_c1_label(4, "Mode Autentikasi CF:")
+        add_c1_label(4, "AyriMail API Key:")
+        self.ayrimail_api_key_var = tk.StringVar(value=config.get("ayrimail_api_key", ""))
+        self.ayrimail_api_key_entry = tk_entry(card1, textvariable=self.ayrimail_api_key_var, width=24)
+        add_c1_field(self.ayrimail_api_key_entry, 4)
+
+        add_c1_label(5, "Domain AyriMail:")
+        self.ayrimail_domain_var = tk.StringVar(value=config.get("ayrimail_domain", "random"))
+        self.ayrimail_domain_combo = tk_option_menu(
+            card1, self.ayrimail_domain_var, ["random", "canvaisme.web.id", "mascara.biz.id"], width=12
+        )
+        add_c1_field(self.ayrimail_domain_combo, 5)
+
+        add_c1_label(6, "Mode Autentikasi CF:")
         self.cloudflare_auth_mode_var = tk.StringVar(value=config.get("cloudflare_auth_mode", "none"))
         self.cloudflare_auth_mode_combo = tk_option_menu(
             card1, self.cloudflare_auth_mode_var, ["query-key", "bearer", "x-api-key", "x-admin-auth", "none"], width=12
         )
-        add_c1_field(self.cloudflare_auth_mode_combo, 4)
+        add_c1_field(self.cloudflare_auth_mode_combo, 6)
 
-        add_c1_label(5, "Cloudflare API Base:")
+        add_c1_label(7, "Cloudflare API Base:")
         self.cloudflare_api_base_var = tk.StringVar(value=config.get("cloudflare_api_base", ""))
         self.cloudflare_api_base_entry = tk_entry(card1, textvariable=self.cloudflare_api_base_var, width=24)
-        add_c1_field(self.cloudflare_api_base_entry, 5)
+        add_c1_field(self.cloudflare_api_base_entry, 7)
 
-        add_c1_label(6, "Cloudflare API Key:")
+        add_c1_label(8, "Cloudflare API Key:")
         self.cloudflare_api_key_var = tk.StringVar(value=config.get("cloudflare_api_key", ""))
         self.cloudflare_api_key_entry = tk_entry(card1, textvariable=self.cloudflare_api_key_var, width=24)
-        add_c1_field(self.cloudflare_api_key_entry, 6)
+        add_c1_field(self.cloudflare_api_key_entry, 8)
 
-        add_c1_label(7, "Jalur CF:")
+        add_c1_label(9, "Jalur CF:")
         self.cloudflare_paths_var = tk.StringVar(
             value=",".join(
                 [
@@ -683,7 +695,7 @@ class GrokRegisterGUI:
             )
         )
         self.cloudflare_paths_entry = tk_entry(card1, textvariable=self.cloudflare_paths_var, width=24)
-        add_c1_field(self.cloudflare_paths_entry, 7)
+        add_c1_field(self.cloudflare_paths_entry, 9)
 
 
         # CARD 2: grok2api & Pool
@@ -873,6 +885,8 @@ class GrokRegisterGUI:
             return
 
         config["email_provider"] = self.email_provider_var.get().strip() or "ayrimail"
+        config["ayrimail_api_key"] = self.ayrimail_api_key_var.get().strip()
+        config["ayrimail_domain"] = self.ayrimail_domain_var.get().strip() or "random"
         config["enable_nsfw"] = bool(self.nsfw_var.get())
         config["proxy"] = self.proxy_var.get().strip()
         config["cloudflare_api_base"] = self.cloudflare_api_base_var.get().strip()
