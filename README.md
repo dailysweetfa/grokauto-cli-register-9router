@@ -29,9 +29,29 @@ Untuk mendapatkan kunci lisensi aktivasi program ini, silakan melakukan pembelia
 
 ---
 
-> [!WARNING]  
-> **DISCLAIMER / PERNYATAAN HUKUM**:  
-> Alat ini dibuat hanya untuk tujuan penelitian otomatisasi web, pengujian integrasi sistem, dan edukasi pribadi. Harap patuhi Ketentuan Layanan (ToS) dari situs web target, undang-undang setempat, serta kebijakan penyedia pihak ketiga. Penyalahgunaan alat ini di luar tanggung jawab pengembang.
+## ✨ FITUR-FITUR UNGGULAN (KEY FEATURES)
+
+* 🤖 **Otomatisasi Registrasi Grok/xAI 100% Autopilot**:
+  Pengisian nama, pembentukan kata sandi acak yang kuat, pendaftaran alamat email, hingga verifikasi kode OTP dilakukan secara otomatis tanpa campur tangan manual.
+* 🛡️ **Penanganan Cloudflare Turnstile Cerdas (Auto-Solve & Auto-Click)**:
+  Sistem penanganan berbasis token Turnstile yang secara otomatis mendeteksi dan mengeklik kotak centang `[ ] Verify you are human` dalam jeda 2 detik jika verifikasi tertahan.
+* ⚡ **Dukungan Multi-Worker Paralel (Multi-Threading)**:
+  Mendukung pendaftaran massal secara bersamaan (*Concurrent Workers*) untuk menghasilkan puluhan hingga ratusan akun dalam waktu singkat.
+* 🔌 **Integrasi Otomatis & Re-Autentikasi 9Router Proxy**:
+  * **Sinkronisasi Langsung**: Setiap akun baru yang terbentuk otomatis dimasukkan ke database SQLite 9Router (`data.sqlite`).
+  * **Auto Re-Authentication**: Re-autentikasi otomatis OAuth refresh token setiap kali aplikasi dibuka agar koneksi 9Router selalu segar (*fresh*).
+  * **Auto-Cleanup Error**: Pembersihan otomatis akun kadaluarsa (`401` / `402`) dan reset status tertahan (`403` / `429`).
+* 📧 **Dukungan Email Provider Berkualitas Tinggi**:
+  * **AyriMail**: Provider email cepat bawaan yang dirancang khusus untuk registrasi xAI.
+  * **Temp Mail Pribadi (Cloudflare Worker)**: Pemrosesan domain pribadi Cloudflare Worker dengan parser OTP serbaguna yang mengenali 100% format email xAI.
+* 🔒 **Proteksi Biner Mesin & Lisensi Kriptografi**:
+  * Modul utama terkompilasi ke biner C-Extension (`grok_core.pyd`) yang aman dari dekompilasi.
+  * Otentikasi lisensi terikat **Hardware ID (HWID)**, stempel digital HMAC-SHA256, dan proteksi anti-manipulasi jam sistem (*Anti-Clock Rollback*).
+* 🖥️ **Antarmuka Ganda (GUI Visual + CLI Terminal)**:
+  * **GUI Visual**: Tampilan antarmuka grafis Tkinter/TTK yang modern dan mudah digunakan.
+  * **CLI Terminal**: Mode eksekusi terminal hemat *resource* yang cocok untuk Windows Server.
+* 🌶️ **Aktivasi NSFW Otomatis**:
+  Opsi pengaktifan pengaturan NSFW pada profil akun Grok secara otomatis setelah pendaftaran selesai.
 
 ---
 
