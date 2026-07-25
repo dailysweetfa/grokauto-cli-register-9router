@@ -222,7 +222,8 @@ class GrokRegisterGUI:
         ok, info = check_activated_license()
         if ok:
             try:
-                reset_9router_connections_status(log_callback=print)
+                threading.Thread(target=reset_9router_connections_status, daemon=True).start()
+                start_background_9router_daemon(interval_sec=30, log_callback=None)
             except Exception:
                 pass
             self.root.geometry("1120x900")
@@ -1230,8 +1231,8 @@ class GrokRegisterGUI:
 
 def main():
     try:
-        reset_9router_connections_status(print)
-    except Exception:
+        threading.Thread(target=reset_9router_connections_status, daemon=True).start()
+    except BaseException:
         pass
         
     if len(sys.argv) > 1 and sys.argv[1].strip().lower() in ("start", "cli", "--cli"):
