@@ -221,6 +221,10 @@ class GrokRegisterGUI:
         # Check license on start
         ok, info = check_activated_license()
         if ok:
+            try:
+                reset_9router_connections_status(log_callback=print)
+            except Exception:
+                pass
             self.root.geometry("1120x900")
             self.root.minsize(960, 700)
             self.setup_ui()
