@@ -43,6 +43,7 @@
   "browser_restart_every": 10,
   "cpa_mint_async": true,
   "browser_use_custom_ua": false,
+  "auto_add_9router": true,
   "ROUTER9_URL": "http://localhost:20128",
   "ROUTER9_PASS": ""
 }

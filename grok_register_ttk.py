@@ -765,8 +765,10 @@ class GrokRegisterGUI:
         self.nsfw_check = tk_checkbutton(card2, text="Aktifkan NSFW setelah pendaftaran", variable=self.nsfw_var, bg=THEME_CARD_BG)
         add_c2_field(self.nsfw_check, 7)
 
-        # Empty row to balance C2 height with C1
-        tk.Label(card2, text="", bg=THEME_CARD_BG).grid(row=8, column=0, pady=10)
+        add_c2_label(8, "Integrasi 9Router:")
+        self.auto_add_9router_var = tk.BooleanVar(value=bool(config.get("auto_add_9router", True)))
+        self.auto_add_9router_check = tk_checkbutton(card2, text="Otomatis Masukkan ke 9Router", variable=self.auto_add_9router_var, bg=THEME_CARD_BG)
+        add_c2_field(self.auto_add_9router_check, 8)
 
 
         # CARD 3: Log Aktivitas Sesi (Bottom)
@@ -888,6 +890,7 @@ class GrokRegisterGUI:
         config["ayrimail_api_key"] = self.ayrimail_api_key_var.get().strip()
         config["ayrimail_domain"] = self.ayrimail_domain_var.get().strip() or "random"
         config["enable_nsfw"] = bool(self.nsfw_var.get())
+        config["auto_add_9router"] = bool(self.auto_add_9router_var.get())
         config["proxy"] = self.proxy_var.get().strip()
         config["cloudflare_api_base"] = self.cloudflare_api_base_var.get().strip()
         config["cloudflare_api_key"] = self.cloudflare_api_key_var.get().strip()
