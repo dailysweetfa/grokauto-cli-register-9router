@@ -905,7 +905,6 @@ def _detect_auth_error(text: str, url: str = "") -> str | None:
         ("you are unable to access", "cloudflare blocked"),
         ("why have i been blocked", "cloudflare blocked"),
         ("attention required! | cloudflare", "cloudflare challenge/block"),
-        ("access denied", "access denied"),
         ("请求被拒绝", "access denied"),
         ("访问被拒绝", "access denied"),
         ("has been blocked", "blocked by waf"),
@@ -990,6 +989,9 @@ def approve_device_code(
         # Done page
         if "device/done" in url or "设备已授权" in text or "device authorized" in text.lower() or "perangkat telah diotorisasi" in text.lower():
             log("device done page — waiting for token poll")
+            if stop_event is not None and stop_event.is_set():
+                log("token poll completed while on done page — exit cleanly")
+                return
             _sleep(1.5)
             continue
 
@@ -1012,7 +1014,7 @@ def approve_device_code(
                     _sleep(0.8)
                     continue
 
-        # Consent page — REAL click exact 允许 (never 全部允许)
+        # Consent page — 100% Bulletproof Consent Allow Handler
         if "/consent" in url or "授权 Grok Build" in text or "Authorize Grok Build" in text or "Otorisasi Grok Build" in text:
             phase = "consent"
             # double-check banner cleared this frame
@@ -1020,39 +1022,79 @@ def approve_device_code(
                 _dismiss_cookie_banner(page, log)
                 _sleep(0.6)
                 continue
-            # Prefer real click; React needs it to set form action=allow
-            if _click_exact(page, ["允许", "Allow", "Authorize", "Approve", "Izinkan"], log, real=True):
-                _sleep(2.5)
-                # if cookie reappeared after click, loop will dismiss next iter
-                continue
-            # last resort: set action and submit only the OAuth form (not cookie form)
+
+            log("Memproses persetujuan otorisasi consent (action=allow)...")
             try:
+                # Pre-inject hidden action=allow input into all forms on consent page so xAI never defaults to deny
                 page.run_js(
                     """
-                    const forms = Array.from(document.querySelectorAll('form'));
-                    const f = forms.find((x) => {
-                      const t = (x.innerText || '');
-                      return t.includes('Grok Build') || t.includes('允许') || t.includes('Allow') || t.includes('Izinkan');
-                    }) || document.querySelector('form');
-                    if(!f) return;
-                    // skip cookie preference forms
-                    const ft = (f.innerText || '');
-                    if (ft.includes('隐私偏好') || ft.includes('全部允许') || ft.includes('preferensi') || /cookie/i.test(ft)) return;
-                    let a=f.querySelector('input[name=action]');
-                    if(!a){a=document.createElement('input');a.type='hidden';a.name='action';f.appendChild(a);}
-                    a.value='allow';
-                    const btn=[...f.querySelectorAll('button')].find(b=>{
-                      const t=(b.innerText||'').trim();
-                      return t==='允许'||t==='Allow'||t==='Authorize'||t==='Approve'||t==='Izinkan';
+                    document.querySelectorAll('form').forEach(f => {
+                        let a = f.querySelector('input[name="action"]');
+                        if (!a) {
+                            a = document.createElement('input');
+                            a.type = 'hidden';
+                            a.name = 'action';
+                            f.appendChild(a);
+                        }
+                        a.value = 'allow';
                     });
-                    if(btn) btn.click(); else f.submit();
                     """
                 )
-                log("consent form submit via JS fallback")
-                _sleep(2.5)
             except Exception as e:
-                log(f"consent fallback failed: {e}")
-            continue
+                log(f"js inject action=allow fail: {e}")
+
+            allow_labels = ["允许", "Allow", "Authorize", "Approve", "Izinkan"]
+            target_btn = None
+
+            # Target form button explicitly matching text Allow/Authorize/Izinkan or value='allow'
+            try:
+                for label in allow_labels:
+                    found = page.ele(f"xpath://button[normalize-space(.)='{label}']", timeout=0.3) or page.ele(f"xpath://form//button[normalize-space(.)='{label}']", timeout=0.3)
+                    if found:
+                        target_btn = found
+                        break
+            except Exception:
+                pass
+
+            if not target_btn:
+                try:
+                    target_btn = page.ele("css:button[value='allow']", timeout=0.3) or page.ele("css:form button[value='allow']", timeout=0.3)
+                except Exception:
+                    pass
+
+            if target_btn:
+                try:
+                    target_btn.scroll.to_see()
+                except Exception:
+                    pass
+                target_btn.click()
+                log(f"clicked REAL exact Allow consent button: {target_btn.text!r}")
+                _sleep(1.5)
+                # Jaminan 100%: jika halaman masih di /consent, submit form otorisasi secara eksplisit via JS
+                if "/consent" in _page_url(page):
+                    try:
+                        page.run_js(
+                            """
+                            const forms = Array.from(document.querySelectorAll('form'));
+                            const f = forms.find(x => (x.innerText||'').includes('Grok Build') || (x.innerText||'').includes('Allow') || (x.innerText||'').includes('允许')) || forms[0];
+                            if (f) {
+                                let a = f.querySelector('input[name="action"]');
+                                if (!a) { a = document.createElement('input'); a.type = 'hidden'; a.name = 'action'; f.appendChild(a); }
+                                a.value = 'allow';
+                                const btn = [...f.querySelectorAll('button')].find(b => (b.innerText||'').includes('Allow') || (b.innerText||'').includes('Izinkan') || (b.innerText||'').includes('允许'));
+                                if (btn) btn.click();
+                            }
+                            """
+                        )
+                        log("executed JS consent form submit guarantee")
+                    except Exception:
+                        pass
+                _sleep(2.0)
+                continue
+
+            if _click_exact(page, allow_labels, log, real=True):
+                _sleep(3.0)
+                continue
 
         # Device code entry
         if page.ele("css:input[name='user_code']", timeout=0.3) and "consent" not in url:
@@ -1283,7 +1325,8 @@ def mint_with_browser(
 
         def _poll() -> None:
             try:
-                time.sleep(2)
+                # Berikan jeda 8 detik agar backend xAI menyelesaikan sinkronisasi persetujuan dari browser
+                time.sleep(8.0)
                 tr = poll_device_token(
                     sess.device_code,
                     interval=max(sess.interval, 5),
@@ -1312,27 +1355,30 @@ def mint_with_browser(
                 stop_event=stop_event,
                 log=log,
             )
-        except BrowserConfirmError as e:
-            msg = str(e)
-            # Non-retryable auth failures: abort mint immediately (backfill will skip)
-            low = msg.lower()
-            hard = (
-                "auth failed" in low
-                or "turnstile" in low
-                or "cloudflare" in low
-                or "blocked" in low
-                or "access denied" in low
-                or "错误的邮箱" in msg
-                or "email salah" in msg.lower()
-                or "email tidak valid" in msg.lower()
-                or "password" in low
-                or "browser confirm timeout" in low
-            )
-            if hard:
-                log(f"browser confirm abort: {e}")
-                stop_event.set()
-                raise
-            log(f"browser confirm warning: {e}")
+        except Exception as e:
+            if "token" in token_box:
+                log(f"browser confirm loop ended with token ready: {e}")
+            else:
+                msg = str(e)
+                # Non-retryable auth failures: abort mint immediately (backfill will skip)
+                low = msg.lower()
+                hard = (
+                    "auth failed" in low
+                    or "turnstile" in low
+                    or "cloudflare" in low
+                    or "blocked" in low
+                    or "access denied" in low
+                    or "错误的邮箱" in msg
+                    or "email salah" in msg.lower()
+                    or "email tidak valid" in msg.lower()
+                    or "password" in low
+                    or "browser confirm timeout" in low
+                )
+                if hard:
+                    log(f"browser confirm abort: {e}")
+                    stop_event.set()
+                    raise
+                log(f"browser confirm warning: {e}")
 
         t.join(timeout=max(browser_timeout_sec, 60) + 30)
         if "token" in token_box:

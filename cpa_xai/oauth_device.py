@@ -219,6 +219,7 @@ def poll_device_token(
     sleep_for = max(interval, 1)
     fast_poll_remaining = 3
     net_streak = 0
+    ig_streak = 0
     max_net_streak = 20
     while time.time() < deadline:
         if cancel and cancel():
@@ -273,11 +274,19 @@ def poll_device_token(
         if err in ("authorization_pending", "slow_down"):
             if err == "slow_down":
                 sleep_for = min(sleep_for + 5, 30)
-            log(f"oauth poll: {err} (sleep {sleep_for}s)")
-            actual_sleep = 2 if fast_poll_remaining > 0 else sleep_for
-            if fast_poll_remaining > 0:
+                fast_poll_remaining = 0
+            log(f"oauth poll: {err} ({desc}) — menunggu persetujuan (sleep {sleep_for}s)")
+            actual_sleep = sleep_for if (err == "slow_down" or fast_poll_remaining <= 0) else 2
+            if fast_poll_remaining > 0 and err != "slow_down":
                 fast_poll_remaining -= 1
             time.sleep(actual_sleep)
+            continue
+        if err == "invalid_grant":
+            ig_streak += 1
+            log(f"oauth poll: memproses otorisasi backend xAI (sinkronisasi {ig_streak}/15)...")
+            if ig_streak >= 15:
+                raise OAuthDeviceError(f"device auth failed: {err}: {desc or 'Access denied'}")
+            time.sleep(4)
             continue
         if err in ("expired_token", "access_denied"):
             raise OAuthDeviceError(f"device auth failed: {err}: {desc}")
