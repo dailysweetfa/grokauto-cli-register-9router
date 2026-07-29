@@ -38,10 +38,15 @@ def mint_and_export(
     log: LogFn | None = None,
     cancel: Callable[[], bool] | None = None,
 ) -> dict[str, Any]:
-    """Full pipeline: device-auth → write CPA file → optional probe.
+    """Full pipeline: OAuth mint → write CPA file → optional probe.
+
+    Default mint is authorization_code+PKCE (9router). Override via
+    env CPA_OAUTH_FLOW=device_code for legacy device grant.
 
     Returns dict with keys: ok, path, email, probe, error?
     """
+    import os
+
     log = log or _noop
     email = (email or "").strip()
     if not email or not password:
@@ -51,7 +56,11 @@ def mint_and_export(
     # Thread-local pin — safe under concurrent mint workers.
     resolved = resolve_proxy(proxy)
     set_runtime_proxy(resolved or None)
-    log(f"mint start: {email} proxy={proxy_log_label(resolved) or '(none)'}")
+    oauth_flow = (os.environ.get("CPA_OAUTH_FLOW") or "auth_code").strip()
+    log(
+        f"mint start: {email} flow={oauth_flow} "
+        f"proxy={proxy_log_label(resolved) or '(none)'}"
+    )
     try:
         tokens = mint_with_browser(
             email=email,
@@ -66,6 +75,7 @@ def mint_and_export(
             recycle_every=recycle_every,
             poll_log=log,
             cancel=cancel,
+            oauth_flow=oauth_flow,
         )
     except Exception as e:  # noqa: BLE001
         log(f"mint failed: {e}")
@@ -79,6 +89,7 @@ def mint_and_export(
         expires_in=tokens.get("expires_in"),
         base_url=base_url,
         headers=headers,
+        extra={"auth_method": tokens.get("auth_method") or oauth_flow},
     )
     path = write_cpa_xai_auth(auth_dir, payload)
     log(f"wrote {path}")

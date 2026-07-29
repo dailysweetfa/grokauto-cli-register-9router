@@ -2,7 +2,7 @@
 
 Paths resolve relative to the grok_reg project root (parent of cpa_xai).
 
-Proven flow (2026-07-10, free account):
+Proven flow (Path B closed-loop, 2026-07-24):
   1. Open verification_uri_complete (user_code prefilled)
   2. Click 继续 on device page
   3. Cookie / 隐私偏好 banner: 全部允许 BEFORE OAuth 允许 (modal blocks consent)
@@ -11,10 +11,10 @@ Proven flow (2026-07-10, free account):
   6. May land /account redirect or device page → 继续
   7. Consent page /oauth2/device/consent → REAL click exact 允许
      (by_js click causes Invalid action / empty form action)
-  8. /oauth2/device/done "设备已授权" + token poll SUCCESS
+  8. /oauth2/device/done "设备已授权" → THEN poll token (not parallel)
 
 Hard rules:
-  - Token poll is source of truth
+  - Browser authorize first, then token poll (source of truth)
   - Button match is EXACT text only (允许 ≠ 全部允许)
   - Cookie modal must be dismissed before consent Allow
   - Consent Allow MUST be a real click, not by_js
@@ -44,7 +44,20 @@ class BrowserConfirmError(RuntimeError):
 
 
 def _sleep(sec: float) -> None:
-    time.sleep(sec)
+    # v2: jitter fixed UI waits so mint steps look less robotic
+    try:
+        import human as _human  # type: ignore
+
+        cfg = {}
+        try:
+            import register_core as _rc  # type: ignore
+
+            cfg = getattr(_rc, "config", {}) or {}
+        except Exception:
+            pass
+        time.sleep(_human.spice(float(sec), cfg))
+    except Exception:
+        time.sleep(sec)
 
 
 
@@ -143,9 +156,6 @@ def _is_turnstile_challenge(text: str) -> bool:
         "cf-turnstile",
         "进行人机验证",
         "人机验证",
-        "konfirmasi anda adalah manusia",
-        "konfirmasi bahwa anda adalah manusia",
-        "verifikasi manusia",
     )
     return any(n in t or n in tl for n in needles)
 
@@ -167,18 +177,16 @@ def create_standalone_page(
     # Project root = parent of this package (./cpa_xai → ../)
     _pkg_root = Path(__file__).resolve().parents[1]
     try:
-        reg_file = _pkg_root / "grok_register_ttk.py"
+        reg_file = _pkg_root / "register_core.py"
         if reg_file.is_file():
             reg_dir = str(_pkg_root)
             if reg_dir not in sys.path:
                 sys.path.insert(0, reg_dir)
             try:
-                from grok_register_ttk import create_browser_options  # type: ignore
+                from register_core import create_browser_options  # type: ignore
 
                 opts = create_browser_options()
-                if opts is not None:
-                    opts.auto_port()
-                log("using register create_browser_options (turnstilePatch) with auto_port")
+                log("using register create_browser_options (turnstilePatch)")
             except Exception as e:  # noqa: BLE001
                 log(f"register browser options unavailable: {e}")
                 opts = None
@@ -234,14 +242,25 @@ def create_standalone_page(
                 pass
             break
 
-    from .proxyutil import proxy_for_chromium, proxy_log_label, resolve_proxy
+    from .proxyutil import proxy_log_label, resolve_proxy, prepare_chrome_proxy
 
     # explicit / runtime config first; env only as fallback
     proxy = resolve_proxy(proxy)
-    chrome_proxy = proxy_for_chromium(proxy)
-    if chrome_proxy:
-        opts.set_argument(f"--proxy-server={chrome_proxy}")
-        log(f"browser proxy={proxy_log_label(proxy)} (chromium {chrome_proxy})")
+    if proxy:
+        # Check and handle authenticated proxy via extension
+        if prepare_chrome_proxy(proxy, opts):
+            log(f"browser proxy={proxy_log_label(proxy)} (via auth extension)")
+        else:
+            try:
+                opts.set_proxy(proxy)
+                log(f"browser proxy={proxy_log_label(proxy)}")
+            except Exception as e:
+                # Fallback to --proxy-server (without auth) if set_proxy fails
+                from .proxyutil import proxy_for_chromium
+                chrome_proxy = proxy_for_chromium(proxy)
+                if chrome_proxy:
+                    opts.set_argument(f"--proxy-server={chrome_proxy}")
+                log(f"browser proxy={proxy_log_label(proxy)} (fallback, error: {e})")
     else:
         log("browser proxy=(none)")
 
@@ -259,10 +278,12 @@ def create_standalone_page(
 
 
 def close_standalone(browser: Any) -> None:
-    try:
-        browser.quit()
-    except Exception:
-        pass
+    def _do_quit():
+        try:
+            browser.quit()
+        except Exception:
+            pass
+    threading.Thread(target=_do_quit, daemon=True).start()
 
 
 # ── mint browser reuse (per-thread) ──
@@ -611,17 +632,14 @@ def _cookie_banner_visible(text: str) -> bool:
         "我们使用 cookie",
         "接受所有 cookie",
         "accept all cookies",
+        "cookies settings",
         "cookie preferences",
-        "preferensi privasi",
-        "semua diizinkan",
-        "semua ditolak",
-        "kami menggunakan cookie",
-        "terima semua cookie",
+        "reject all",
     )
     return any(n in t or n in tl for n in strong)
 
 
-def _dismiss_cookie_banner(page: Any, log: LogFn) -> bool:
+def dismiss_cookie_banner(page: Any, log: LogFn) -> bool:
     """Dismiss xAI/OneTrust-style cookie/privacy modal so consent Allow is clickable.
 
     Prefer 全部允许 (Accept all). Never click bare 允许 here — that is OAuth consent.
@@ -631,44 +649,34 @@ def _dismiss_cookie_banner(page: Any, log: LogFn) -> bool:
     if not _cookie_banner_visible(text):
         return False
 
-    # Exact labels only — 允许 alone is OAuth, not cookie
-    labels = [
-        "全部允许",
-        "接受所有",
-        "接受全部",
-        "Accept all",
-        "Accept All",
-        "Allow all",
-        "Allow All",
-        "I agree",
-        "Agree",
-        "Semua Diizinkan",
-        "Setujui Semua",
-        "Terima Semua",
-        "Izinkan Semua",
-        "Izinkan semua",
-    ]
-    hit = _click_exact(page, labels, log, real=False)
-    if hit:
-        log(f"cookie banner dismissed via {hit!r}")
-        _sleep(0.8)
-        return True
-
-    # JS: click highest z-index / dialog button matching accept-all text
+    # Scope exact matches to a cookie dialog. A global "Agree" match can hit ToS/OAuth.
     try:
         ok = page.run_js(
-            """
-const want = new Set([
-  '全部允许','接受所有','接受全部','Accept all','Accept All','Allow all','Allow All','I agree','Agree','Semua Diizinkan','Setujui Semua','Terima Semua','Izinkan Semua','Izinkan semua'
-]);
-const btns = Array.from(document.querySelectorAll('button, [role="button"], a'));
-const match = btns.find((b) => want.has(String(b.innerText || b.textContent || '').trim()));
-if (match) { match.click(); return String(match.innerText || '').trim(); }
-// close icon on privacy dialog
-const close = document.querySelector(
-  '[aria-label="Close"], [aria-label="关闭"], [aria-label="Tutup"], button[class*="close"], [data-testid*="close"]'
-);
-if (close) { close.click(); return 'close'; }
+            r"""
+const accept = [
+  '全部允许','接受所有','接受全部',
+  'accept all cookies','accept all','allow all cookies','allow all','i agree','agree'
+];
+const reject = ['全部拒绝','reject all cookies','reject all','decline'];
+const norm = (node) => String(
+  node.innerText || node.textContent || node.value || node.getAttribute('aria-label') || ''
+).replace(/\s+/g, ' ').trim().toLowerCase();
+const visible = (node) => {
+  const style = window.getComputedStyle(node);
+  const rect = node.getBoundingClientRect();
+  return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+};
+const roots = Array.from(document.querySelectorAll(
+  '#onetrust-banner-sdk, #onetrust-pc-sdk, [id*="cookie" i], [class*="cookie-banner" i], [role="dialog"]'
+)).filter((node) => visible(node) && /cookie|隐私偏好|全部允许|全部拒绝|privacy preference/i.test(norm(node)));
+for (const root of roots) {
+  const buttons = Array.from(root.querySelectorAll('button, [role="button"], a, input[type="button"]')).filter(visible);
+  const match = buttons.find((node) => accept.includes(norm(node)))
+    || buttons.find((node) => reject.includes(norm(node)));
+  if (match) { const label = norm(match); match.click(); return label; }
+  const close = root.querySelector('[aria-label="Close"], [aria-label="关闭"], button[class*="close"], [data-testid*="close"]');
+  if (close && visible(close)) { close.click(); return 'close'; }
+}
 return '';
             """
         )
@@ -679,12 +687,6 @@ return '';
     except Exception as e:
         log(f"cookie banner JS dismiss failed: {e}")
 
-    # last resort: 全部拒绝 also clears the overlay
-    hit = _click_exact(page, ["全部拒绝", "Reject all", "Reject All", "Decline", "Semua Ditolak", "Tolak Semua"], log, real=False)
-    if hit:
-        log(f"cookie banner dismissed via reject {hit!r}")
-        _sleep(0.8)
-        return True
     log("cookie banner visible but dismiss failed")
     return False
 
@@ -723,6 +725,77 @@ def _click_exact(
                 except Exception as e2:
                     log(f"js fallback {label!r} failed: {e2}")
     return None
+
+
+def _click_consent_allow(page: Any, log: LogFn) -> bool:
+    """Find and REAL-click the consent Allow button across ALL element types.
+
+    JS .click() produces untrusted events that xAI consent page ignores.
+    This uses DrissionPage physical click (CDP Input.dispatchMouseEvent)
+    which generates trusted events.
+    """
+    allow_labels = ("Allow", "允许", "Authorize", "Approve", "Izinkan")
+
+    # Strategy 1: xpath search for ANY visible element with exact Allow text
+    for label in allow_labels:
+        for xpath in (
+            f"xpath://*[normalize-space(.)='{label}' and "
+            f"(self::button or self::a or @role='button' or self::input)]",
+            f"xpath://button[normalize-space(.)='{label}']",
+            f"xpath://a[normalize-space(.)='{label}']",
+        ):
+            try:
+                el = page.ele(xpath, timeout=0.5)
+                if el is not None:
+                    try:
+                        el.scroll.to_see()
+                    except Exception:
+                        pass
+                    _sleep(0.3)
+                    el.click()
+                    log(f"consent REAL click via xpath: {label!r}")
+                    return True
+            except Exception:
+                continue
+
+    # Strategy 2: find ALL visible elements, filter by text, real-click
+    for tag_query in ("tag:button", "tag:a", "css:[role='button']"):
+        try:
+            els = page.eles(tag_query, timeout=0.3) or []
+            for el in els:
+                try:
+                    txt = _norm(el.text or "")
+                    if txt in allow_labels:
+                        try:
+                            el.scroll.to_see()
+                        except Exception:
+                            pass
+                        _sleep(0.2)
+                        el.click()
+                        log(f"consent REAL click via tag scan: {txt!r}")
+                        return True
+                except Exception:
+                    continue
+        except Exception:
+            continue
+
+    # Strategy 3: DrissionPage text search (matches partial)
+    for label in allow_labels:
+        try:
+            el = page.ele(f"text={label}", timeout=0.3)
+            if el is not None:
+                try:
+                    el.scroll.to_see()
+                except Exception:
+                    pass
+                _sleep(0.2)
+                el.click()
+                log(f"consent REAL click via text search: {label!r}")
+                return True
+        except Exception:
+            continue
+
+    return False
 
 
 def _wait_turnstile(
@@ -892,19 +965,12 @@ def _detect_auth_error(text: str, url: str = "") -> str | None:
         ("too many attempts", "too many login attempts"),
         ("尝试次数过多", "登录尝试次数过多"),
         ("登录尝试次数过多", "登录尝试次数过多"),
-        ("alamat email atau kata sandi salah", "Alamat email atau kata sandi salah"),
-        ("alamat email atau kata sandi tidak benar", "Alamat email atau kata sandi tidak benar"),
-        ("kata sandi salah", "Kata sandi salah"),
-        ("akun tidak terdaftar", "Akun tidak terdaftar"),
-        ("terlalu banyak percobaan", "Terlalu banyak percobaan masuk"),
-        ("terlalu banyak percobaan masuk", "Terlalu banyak percobaan masuk"),
-        ("permintaan ditolak", "Permintaan ditolak"),
-        ("akses ditolak", "Akses ditolak"),
         # Cloudflare / WAF hard blocks — never worth waiting for timeout
         ("sorry, you have been blocked", "cloudflare blocked"),
         ("you are unable to access", "cloudflare blocked"),
         ("why have i been blocked", "cloudflare blocked"),
         ("attention required! | cloudflare", "cloudflare challenge/block"),
+        ("access denied", "access denied"),
         ("请求被拒绝", "access denied"),
         ("访问被拒绝", "access denied"),
         ("has been blocked", "blocked by waf"),
@@ -921,6 +987,378 @@ def _detect_auth_error(text: str, url: str = "") -> str | None:
     ):
         return "cloudflare blocked on set-cookie"
     return None
+
+
+def approve_auth_code(
+    page: Any,
+    *,
+    authorize_url: str,
+    email: str,
+    password: str,
+    expected_state: str = "",
+    timeout_sec: float = 240.0,
+    stop_event: threading.Event | None = None,
+    log: LogFn | None = None,
+    early_done: Callable[[], dict[str, str] | None] | None = None,
+) -> dict[str, str] | None:
+    """Drive browser through 9router-style authorize URL until loopback redirect.
+
+    Returns callback query params if the browser URL itself lands on
+    127.0.0.1:56121/callback. ``early_done`` may return params already
+    captured by the loopback HTTP server (preferred).
+    """
+    from .oauth_authcode import LOOPBACK_HOST, LOOPBACK_PORT, parse_callback_url
+
+    log = log or _noop_log
+    if page is None:
+        raise BrowserConfirmError("page is None")
+    email = (email or "").strip()
+    password = password or ""
+    if not email or not password:
+        raise BrowserConfirmError("email/password required")
+
+    log(f"open authorize url: {authorize_url[:120]}...")
+    try:
+        page.get(authorize_url, timeout=60)
+    except TypeError:
+        page.get(authorize_url)
+    _sleep(2.0)
+
+    deadline = time.time() + timeout_sec
+    phase = "authorize"
+    login_attempts = 0
+    last_url = ""
+    loopback_marker = f"{LOOPBACK_HOST}:{LOOPBACK_PORT}"
+
+    while time.time() < deadline:
+        if stop_event is not None and stop_event.is_set():
+            log("stop_event set — leave auth-code loop")
+            return None
+
+        if early_done is not None:
+            try:
+                snap = early_done()
+            except Exception:
+                snap = None
+            if snap and (snap.get("code") or snap.get("error")):
+                log("auth-code captured via loopback (early_done)")
+                if expected_state and snap.get("state") and snap.get("state") != expected_state:
+                    raise BrowserConfirmError(
+                        f"oauth state mismatch got={snap.get('state')!r}"
+                    )
+                if snap.get("error"):
+                    raise BrowserConfirmError(
+                        f"oauth callback error: {snap.get('error')}: "
+                        f"{snap.get('error_description') or ''}"
+                    )
+                return snap
+
+        url = _page_url(page)
+        text = _visible_text(page)
+        if url != last_url:
+            log(f"url: {url[:180]}")
+            last_url = url
+            snip = _norm(text)[:160]
+            if snip:
+                log(f"visible: {snip}")
+
+        # Success: browser redirected to loopback callback
+        if loopback_marker in url and ("/callback" in url or "code=" in url):
+            params = parse_callback_url(url)
+            if expected_state and params.get("state") and params.get("state") != expected_state:
+                raise BrowserConfirmError(
+                    f"oauth state mismatch got={params.get('state')!r}"
+                )
+            if params.get("error"):
+                raise BrowserConfirmError(
+                    f"oauth callback error: {params.get('error')}: "
+                    f"{params.get('error_description') or ''}"
+                )
+            if params.get("code"):
+                log("auth-code callback in browser url")
+                return params
+            log("loopback url without code yet")
+            _sleep(0.5)
+            continue
+
+        auth_err = _detect_auth_error(text, url)
+        if auth_err:
+            shot = None
+            if "block" in auth_err or "cloudflare" in auth_err or "access denied" in auth_err:
+                shot = _save_debug_shot(page, tag="cf-block-authcode", email=email, log=log)
+            msg = auth_err
+            if shot:
+                msg = f"{auth_err} shot={shot}"
+            log(f"auth error: {msg} — skip")
+            raise BrowserConfirmError(f"auth failed: {msg}")
+
+        if "Invalid action" in text:
+            log("Invalid action — reopen authorize url")
+            page.get(authorize_url)
+            _sleep(2.0)
+            phase = "authorize"
+            continue
+
+        # ── xAI "code displayed" page: consent was approved, waiting for
+        #    loopback server to receive redirect.  The page says
+        #    "Enter this code to finish signing in" or
+        #    "It'll automatically detect a successful completion".
+        #    Just wait for early_done / loopback — do NOT keep clicking Allow.
+        if (
+            "finish signing in" in text.lower()
+            or "successful completion" in text.lower()
+            or "copy the code below" in text.lower()
+        ):
+            if phase != "waiting_loopback":
+                log("consent approved — page shows code, waiting for loopback callback...")
+                phase = "waiting_loopback"
+                _waiting_loopback_start = time.time()
+            # Check early_done (loopback HTTP server captured code)
+            if early_done is not None:
+                try:
+                    snap = early_done()
+                except Exception:
+                    snap = None
+                if snap and snap.get("code"):
+                    log("auth-code captured via loopback while on code-display page")
+                    return snap
+            # After 15s waiting for loopback without result, try to extract
+            # code from page or navigate browser to force the redirect
+            _waited = time.time() - _waiting_loopback_start if "_waiting_loopback_start" in dir() else 0
+            if _waited > 15:
+                # Try to extract authorization code from visible input on page
+                try:
+                    code_el = page.ele("css:input[readonly]", timeout=0.3)
+                    if code_el:
+                        code_val = (code_el.value or code_el.attr("value") or "").strip()
+                        if code_val and len(code_val) > 20:
+                            log(f"extracted code from page input: len={len(code_val)}")
+                            return {"code": code_val, "state": expected_state}
+                except Exception:
+                    pass
+                # Try to find code in any visible text that looks like a code
+                try:
+                    code_on_page = page.run_js(
+                        """
+const inputs = document.querySelectorAll('input[readonly], input[type="text"][readonly], code, pre');
+for (const el of inputs) {
+    const v = (el.value || el.innerText || '').trim();
+    if (v && v.length > 20 && /^[A-Za-z0-9_\\-]+$/.test(v.replace(/\\s/g, ''))) return v;
+}
+return '';
+                        """
+                    )
+                    if code_on_page and len(str(code_on_page)) > 20:
+                        log(f"extracted code from page via JS: len={len(str(code_on_page))}")
+                        return {"code": str(code_on_page).strip(), "state": expected_state}
+                except Exception:
+                    pass
+                log(f"loopback no callback after {_waited:.0f}s, still waiting...")
+                _waiting_loopback_start = time.time()  # reset to avoid spamming
+            _sleep(1.5)
+            continue
+
+        if _cookie_banner_visible(text):
+            if dismiss_cookie_banner(page, log):
+                _sleep(0.6)
+                continue
+            if "隐私偏好" in text or "全部允许" in text:
+                if "/consent" in url or "授权" in text or "Authorize" in text or "Grok" in text:
+                    log("consent blocked by cookie banner — retry dismiss")
+                    _sleep(0.8)
+                    continue
+
+        # Consent (auth-code uses /oauth2/consent or similar, not only device/consent)
+        if (
+            "/consent" in url
+            or "授权 Grok" in text
+            or "Authorize Grok" in text
+            or "Authorize application" in text
+            or "授权应用" in text
+            or "wants to" in text
+            or "Access other apps" in text
+        ):
+            phase = "consent"
+            if _cookie_banner_visible(_visible_text(page)):
+                dismiss_cookie_banner(page, log)
+                _sleep(0.6)
+                continue
+            # v2.1: brute-force JS click ANY element with Allow/Authorize text
+            try:
+                js_ok = page.run_js(
+                    """
+const labels = ['Allow', 'Authorize', 'Approve', '允许', 'Izinkan'];
+const norm = (n) => (n.innerText || n.textContent || n.value || n.getAttribute('aria-label') || '').replace(/\\s+/g, ' ').trim();
+const visible = (n) => {
+  try {
+    const s = window.getComputedStyle(n);
+    const r = n.getBoundingClientRect();
+    return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0;
+  } catch(e) { return false; }
+};
+// Search ALL clickable elements, not just <button>
+const candidates = Array.from(document.querySelectorAll('button, a, [role="button"], input[type="button"], input[type="submit"], div[tabindex], span[tabindex]'));
+for (const el of candidates) {
+  if (!visible(el)) continue;
+  const t = norm(el);
+  if (labels.includes(t)) {
+    el.scrollIntoView({block:'center'});
+    el.focus();
+    el.click();
+    return t;
+  }
+}
+// Fallback: find form with action input and submit
+const forms = Array.from(document.querySelectorAll('form'));
+const f = forms.find(x => {
+  const t = (x.innerText || '');
+  return t.includes('Allow') || t.includes('允许') || t.includes('wants to') || t.includes('Grok');
+});
+if (f) {
+  const ft = (f.innerText || '');
+  if (ft.includes('隐私偏好') || ft.includes('全部允许') || /cookie/i.test(ft)) return '';
+  let a = f.querySelector('input[name=action]');
+  if (!a) { a = document.createElement('input'); a.type='hidden'; a.name='action'; f.appendChild(a); }
+  a.value = 'allow';
+  const btn = [...f.querySelectorAll('button, a, [role="button"]')].find(b => labels.includes(norm(b)));
+  if (btn) btn.click(); else f.submit();
+  return 'form-submit';
+}
+return '';
+                    """
+                )
+                if js_ok:
+                    log(f"consent clicked via JS brute-force: {js_ok!r}")
+                    _sleep(2.5)
+                    continue
+            except Exception as e:
+                log(f"consent JS brute-force failed: {e}")
+            # Fallback: DrissionPage exact click
+            if _click_exact(page, ["Allow", "允许", "Authorize", "Approve", "Izinkan"], log, real=True):
+                _sleep(2.5)
+                continue
+            try:
+                page.run_js(
+                    """
+                    const forms = Array.from(document.querySelectorAll('form'));
+                    const f = forms.find((x) => {
+                      const t = (x.innerText || '');
+                      return t.includes('Grok') || t.includes('允许') || t.includes('Allow');
+                    }) || document.querySelector('form');
+                    if(!f) return;
+                    const ft = (f.innerText || '');
+                    if (ft.includes('隐私偏好') || ft.includes('全部允许') || /cookie/i.test(ft)) return;
+                    let a=f.querySelector('input[name=action]');
+                    if(!a){a=document.createElement('input');a.type='hidden';a.name='action';f.appendChild(a);}
+                    a.value='allow';
+                    const btn=[...f.querySelectorAll('button')].find(b=>{
+                      const t=(b.innerText||'').trim();
+                      return t==='允许'||t==='Allow'||t==='Authorize'||t==='Approve';
+                    });
+                    if(btn) btn.click(); else f.submit();
+                    """
+                )
+                log("consent form submit via JS fallback")
+                _sleep(2.5)
+            except Exception as e:
+                log(f"consent fallback failed: {e}")
+            continue
+
+        if "正在重定向" in text or ("/account" in url and "sign-in" not in url and "sign-up" not in url):
+            if _click_exact(page, ["继续", "Continue"], log, real=False):
+                _sleep(2.0)
+                continue
+
+        if _cookie_banner_visible(text):
+            dismiss_cookie_banner(page, log)
+            _sleep(0.4)
+
+        if "使用邮箱登录" in text or "Continue with email" in text:
+            if _click_exact(
+                page, ["使用邮箱登录", "Continue with email", "Sign in with email"], log, real=False
+            ):
+                _sleep(1.5)
+                phase = "email"
+                continue
+
+        if page.ele("css:input[type='email']", timeout=0.3) and not page.ele(
+            "css:input[type='password']", timeout=0.2
+        ):
+            phase = "email"
+            _fill(page, "css:input[type='email']", email, log, "email")
+            if _click_exact(page, ["下一步", "Next", "Continue", "继续"], log, real=False):
+                _sleep(1.8)
+                continue
+
+        if page.ele("css:input[type='password']", timeout=0.3):
+            phase = "password"
+            if login_attempts >= 3:
+                auth_err = _detect_auth_error(text, url) or "login failed after retries"
+                log(f"auth error: {auth_err} — skip")
+                raise BrowserConfirmError(f"auth failed: {auth_err}")
+            login_attempts += 1
+            log(f"login attempt {login_attempts}")
+            _fill(page, "css:input[type='email']", email, log, "email")
+            _wait_turnstile(page, log, 25, email=email, raise_on_timeout=True)
+            _fill(page, "css:input[type='password']", password, log, "password")
+            _wait_turnstile(page, log, 12, email=email, raise_on_timeout=False)
+            if not _click_exact(page, ["登录", "Sign in", "Log in"], log, real=True):
+                try:
+                    el = page.ele("css:button[type='submit']", timeout=0.5) or page.ele(
+                        "css:button[data-testid='sign-in-submit']", timeout=0.5
+                    )
+                    if el:
+                        el.click()
+                        log("clicked login submit real")
+                except Exception as e:
+                    log(f"login submit fail: {e}")
+            for _ in range(20):
+                if stop_event is not None and stop_event.is_set():
+                    return None
+                _sleep(0.5)
+                post = _visible_text(page)
+                cur = _page_url(page)
+                if loopback_marker in cur:
+                    break
+                auth_err = _detect_auth_error(post, cur)
+                if auth_err:
+                    log(f"auth error after login: {auth_err} — skip")
+                    raise BrowserConfirmError(f"auth failed: {auth_err}")
+                if not page.ele("css:input[type='password']", timeout=0.2):
+                    break
+                if "sign-in" not in cur:
+                    break
+            post = _visible_text(page)
+            auth_err = _detect_auth_error(post, _page_url(page))
+            if auth_err:
+                log(f"auth error after login: {auth_err} — skip")
+                raise BrowserConfirmError(f"auth failed: {auth_err}")
+            if page.ele("css:input[type='password']", timeout=0.2) and (
+                _is_turnstile_challenge(post) or login_attempts >= 2
+            ):
+                shot = _save_debug_shot(
+                    page, tag="login-stuck-turnstile-authcode", email=email, log=log
+                )
+                msg = "turnstile/login stuck after submit"
+                if shot:
+                    msg = f"{msg} shot={shot}"
+                raise BrowserConfirmError(f"auth failed: {msg}")
+            continue
+
+        # Already logged in: sometimes need Continue on intermediate pages
+        if _click_exact(page, ["继续", "Continue"], log, real=False):
+            _sleep(1.5)
+            continue
+
+        _sleep(1.0)
+
+    if stop_event is not None and stop_event.is_set():
+        return None
+    shot = _save_debug_shot(page, tag=f"timeout-authcode-{phase}", email=email, log=log)
+    msg = f"auth-code browser timeout phase={phase} login_attempts={login_attempts}"
+    if shot:
+        msg = f"{msg} shot={shot}"
+    raise BrowserConfirmError(msg)
 
 
 def approve_device_code(
@@ -986,14 +1424,10 @@ def approve_device_code(
             log(f"auth error: {msg} — skip")
             raise BrowserConfirmError(f"auth failed: {msg}")
 
-        # Done page
-        if "device/done" in url or "设备已授权" in text or "device authorized" in text.lower() or "perangkat telah diotorisasi" in text.lower():
-            log("device done page — waiting for token poll")
-            if stop_event is not None and stop_event.is_set():
-                log("token poll completed while on done page — exit cleanly")
-                return
-            _sleep(1.5)
-            continue
+        # Done page — Path B: browser done first, caller polls token after return
+        if "device/done" in url or "设备已授权" in text or "device authorized" in text.lower():
+            log("device done page — browser authorized")
+            return
 
         if "Invalid action" in text:
             log("Invalid action — reopen device uri")
@@ -1004,97 +1438,104 @@ def approve_device_code(
 
         # Cookie / privacy modal first (blocks OAuth 允许 on consent page)
         if _cookie_banner_visible(text):
-            if _dismiss_cookie_banner(page, log):
+            if dismiss_cookie_banner(page, log):
                 _sleep(0.6)
                 continue
             # Modal still up: never click OAuth 允许 under the overlay
-            if "隐私偏好" in text or "全部允许" in text or "preferensi privasi" in text.lower() or "semua diizinkan" in text.lower():
-                if "/consent" in url or "授权 Grok Build" in text or "Authorize Grok Build" in text or "Otorisasi Grok Build" in text:
+            if "隐私偏好" in text or "全部允许" in text:
+                if "/consent" in url or "授权 Grok Build" in text or "Authorize Grok Build" in text:
                     log("consent blocked by cookie banner — retry dismiss")
                     _sleep(0.8)
                     continue
 
-        # Consent page — 100% Bulletproof Consent Allow Handler
-        if "/consent" in url or "授权 Grok Build" in text or "Authorize Grok Build" in text or "Otorisasi Grok Build" in text:
+        # Consent page — REAL click exact 允许 (never 全部允许)
+        if "/consent" in url or "授权 Grok Build" in text or "Authorize Grok Build" in text or "wants to" in text or "Access other apps" in text:
             phase = "consent"
             # double-check banner cleared this frame
             if _cookie_banner_visible(_visible_text(page)):
-                _dismiss_cookie_banner(page, log)
+                dismiss_cookie_banner(page, log)
                 _sleep(0.6)
                 continue
-
-            log("Memproses persetujuan otorisasi consent (action=allow)...")
+            # v2.1: brute-force JS click ANY element with Allow/Authorize text
             try:
-                # Pre-inject hidden action=allow input into all forms on consent page so xAI never defaults to deny
-                page.run_js(
+                js_ok = page.run_js(
                     """
-                    document.querySelectorAll('form').forEach(f => {
-                        let a = f.querySelector('input[name="action"]');
-                        if (!a) {
-                            a = document.createElement('input');
-                            a.type = 'hidden';
-                            a.name = 'action';
-                            f.appendChild(a);
-                        }
-                        a.value = 'allow';
-                    });
+const labels = ['Allow', 'Authorize', 'Approve', '允许', 'Izinkan'];
+const norm = (n) => (n.innerText || n.textContent || n.value || n.getAttribute('aria-label') || '').replace(/\\s+/g, ' ').trim();
+const visible = (n) => {
+  try {
+    const s = window.getComputedStyle(n);
+    const r = n.getBoundingClientRect();
+    return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0;
+  } catch(e) { return false; }
+};
+const candidates = Array.from(document.querySelectorAll('button, a, [role="button"], input[type="button"], input[type="submit"], div[tabindex], span[tabindex]'));
+for (const el of candidates) {
+  if (!visible(el)) continue;
+  const t = norm(el);
+  if (labels.includes(t)) {
+    el.scrollIntoView({block:'center'});
+    el.focus();
+    el.click();
+    return t;
+  }
+}
+const forms = Array.from(document.querySelectorAll('form'));
+const f = forms.find(x => {
+  const t = (x.innerText || '');
+  return t.includes('Allow') || t.includes('允许') || t.includes('wants to') || t.includes('Grok');
+});
+if (f) {
+  const ft = (f.innerText || '');
+  if (ft.includes('隐私偏好') || ft.includes('全部允许') || /cookie/i.test(ft)) return '';
+  let a = f.querySelector('input[name=action]');
+  if (!a) { a = document.createElement('input'); a.type='hidden'; a.name='action'; f.appendChild(a); }
+  a.value = 'allow';
+  const btn = [...f.querySelectorAll('button, a, [role="button"]')].find(b => labels.includes(norm(b)));
+  if (btn) btn.click(); else f.submit();
+  return 'form-submit';
+}
+return '';
                     """
                 )
+                if js_ok:
+                    log(f"consent clicked via JS brute-force: {js_ok!r}")
+                    _sleep(2.5)
+                    continue
             except Exception as e:
-                log(f"js inject action=allow fail: {e}")
-
-            allow_labels = ["允许", "Allow", "Authorize", "Approve", "Izinkan"]
-            target_btn = None
-
-            # Target form button explicitly matching text Allow/Authorize/Izinkan or value='allow'
+                log(f"consent JS brute-force failed: {e}")
+            # Prefer real click; React needs it to set form action=allow
+            if _click_exact(page, ["Allow", "允许", "Authorize", "Approve", "Izinkan"], log, real=True):
+                _sleep(2.5)
+                # if cookie reappeared after click, loop will dismiss next iter
+                continue
+            # last resort: set action and submit only the OAuth form (not cookie form)
             try:
-                for label in allow_labels:
-                    found = page.ele(f"xpath://button[normalize-space(.)='{label}']", timeout=0.3) or page.ele(f"xpath://form//button[normalize-space(.)='{label}']", timeout=0.3)
-                    if found:
-                        target_btn = found
-                        break
-            except Exception:
-                pass
-
-            if not target_btn:
-                try:
-                    target_btn = page.ele("css:button[value='allow']", timeout=0.3) or page.ele("css:form button[value='allow']", timeout=0.3)
-                except Exception:
-                    pass
-
-            if target_btn:
-                try:
-                    target_btn.scroll.to_see()
-                except Exception:
-                    pass
-                target_btn.click()
-                log(f"clicked REAL exact Allow consent button: {target_btn.text!r}")
-                _sleep(1.5)
-                # Jaminan 100%: jika halaman masih di /consent, submit form otorisasi secara eksplisit via JS
-                if "/consent" in _page_url(page):
-                    try:
-                        page.run_js(
-                            """
-                            const forms = Array.from(document.querySelectorAll('form'));
-                            const f = forms.find(x => (x.innerText||'').includes('Grok Build') || (x.innerText||'').includes('Allow') || (x.innerText||'').includes('允许')) || forms[0];
-                            if (f) {
-                                let a = f.querySelector('input[name="action"]');
-                                if (!a) { a = document.createElement('input'); a.type = 'hidden'; a.name = 'action'; f.appendChild(a); }
-                                a.value = 'allow';
-                                const btn = [...f.querySelectorAll('button')].find(b => (b.innerText||'').includes('Allow') || (b.innerText||'').includes('Izinkan') || (b.innerText||'').includes('允许'));
-                                if (btn) btn.click();
-                            }
-                            """
-                        )
-                        log("executed JS consent form submit guarantee")
-                    except Exception:
-                        pass
-                _sleep(2.0)
-                continue
-
-            if _click_exact(page, allow_labels, log, real=True):
-                _sleep(3.0)
-                continue
+                page.run_js(
+                    """
+                    const forms = Array.from(document.querySelectorAll('form'));
+                    const f = forms.find((x) => {
+                      const t = (x.innerText || '');
+                      return t.includes('Grok Build') || t.includes('允许') || t.includes('Allow');
+                    }) || document.querySelector('form');
+                    if(!f) return;
+                    const ft = (f.innerText || '');
+                    if (ft.includes('隐私偏好') || ft.includes('全部允许') || /cookie/i.test(ft)) return;
+                    let a=f.querySelector('input[name=action]');
+                    if(!a){a=document.createElement('input');a.type='hidden';a.name='action';f.appendChild(a);}
+                    a.value='allow';
+                    const btn=[...f.querySelectorAll('button')].find(b=>{
+                      const t=(b.innerText||'').trim();
+                      return t==='允许'||t==='Allow'||t==='Authorize'||t==='Approve';
+                    });
+                    if(btn) btn.click(); else f.submit();
+                    """
+                )
+                log("consent form submit via JS fallback")
+                _sleep(2.5)
+            except Exception as e:
+                log(f"consent fallback failed: {e}")
+            continue
 
         # Device code entry
         if page.ele("css:input[name='user_code']", timeout=0.3) and "consent" not in url:
@@ -1109,7 +1550,7 @@ def approve_device_code(
                         log("filled user_code")
                 except Exception:
                     pass
-            if _click_exact(page, ["继续", "Continue", "Lanjutkan"], log, real=False):
+            if _click_exact(page, ["继续", "Continue"], log, real=False):
                 _sleep(2.0)
                 continue
             try:
@@ -1123,19 +1564,19 @@ def approve_device_code(
                 pass
 
         # Account redirect
-        if "正在重定向" in text or "sedang mengalihkan" in text.lower() or ("/account" in url and "sign-in" not in url):
-            if _click_exact(page, ["继续", "Continue", "Lanjutkan"], log, real=False):
+        if "正在重定向" in text or ("/account" in url and "sign-in" not in url):
+            if _click_exact(page, ["继续", "Continue"], log, real=False):
                 _sleep(2.0)
                 continue
 
         # Cookie banner fallback (non-consent pages)
         if _cookie_banner_visible(text):
-            _dismiss_cookie_banner(page, log)
+            dismiss_cookie_banner(page, log)
             _sleep(0.4)
 
         # Sign-in chooser
-        if "使用邮箱登录" in text or "Continue with email" in text or "masuk dengan email" in text.lower():
-            if _click_exact(page, ["使用邮箱登录", "Continue with email", "Sign in with email", "Masuk dengan email"], log, real=False):
+        if "使用邮箱登录" in text or "Continue with email" in text:
+            if _click_exact(page, ["使用邮箱登录", "Continue with email", "Sign in with email"], log, real=False):
                 _sleep(1.5)
                 phase = "email"
                 continue
@@ -1146,7 +1587,7 @@ def approve_device_code(
         ):
             phase = "email"
             _fill(page, "css:input[type='email']", email, log, "email")
-            if _click_exact(page, ["下一步", "Next", "Continue", "继续", "Berikutnya", "Lanjutkan"], log, real=False):
+            if _click_exact(page, ["下一步", "Next", "Continue", "继续"], log, real=False):
                 _sleep(1.8)
                 continue
 
@@ -1178,7 +1619,7 @@ def approve_device_code(
                 raise_on_timeout=False,
             )
             # REAL click login helps form submit
-            if not _click_exact(page, ["登录", "Sign in", "Log in", "Masuk"], log, real=True):
+            if not _click_exact(page, ["登录", "Sign in", "Log in"], log, real=True):
                 try:
                     el = page.ele("css:button[type='submit']", timeout=0.5) or page.ele(
                         "css:button[data-testid='sign-in-submit']", timeout=0.5
@@ -1254,25 +1695,265 @@ def mint_with_browser(
     cookies: Any | None = None,
     reuse_browser: bool = True,
     recycle_every: int = 15,
+    oauth_flow: str = "auth_code",
 ) -> dict[str, Any]:
-    """Request device code, approve in browser, poll tokens.
+    """Mint tokens via browser OAuth.
+
+    Default ``oauth_flow="auth_code"`` mirrors 9router:
+      PKCE + loopback :56121/callback + authorization_code exchange.
+
+    ``oauth_flow="device_code"`` keeps the legacy device grant (often Access denied).
 
     When page is provided, reuse it (registration browser already logged in).
-    When page is None and force_standalone=False, create a reusable mint browser.
-    When force_standalone=True, always create a standalone browser (ignores page).
-    cookies: optional register-browser cookie list to skip re-login.
     """
-    from .oauth_device import OAuthDeviceError, poll_device_token, request_device_code
-    from .proxyutil import proxy_log_label, resolve_proxy, set_runtime_proxy
+    flow = (oauth_flow or "auth_code").strip().lower().replace("-", "_")
+    if flow in ("device", "device_code", "device_auth"):
+        return _mint_device_code(
+            email=email,
+            password=password,
+            page=page,
+            proxy=proxy,
+            headless=headless,
+            browser_timeout_sec=browser_timeout_sec,
+            poll_log=poll_log,
+            cancel=cancel,
+            force_standalone=force_standalone,
+            cookies=cookies,
+            reuse_browser=reuse_browser,
+            recycle_every=recycle_every,
+        )
+    return _mint_auth_code(
+        email=email,
+        password=password,
+        page=page,
+        proxy=proxy,
+        headless=headless,
+        browser_timeout_sec=browser_timeout_sec,
+        poll_log=poll_log,
+        cancel=cancel,
+        force_standalone=force_standalone,
+        cookies=cookies,
+        reuse_browser=reuse_browser,
+        recycle_every=recycle_every,
+    )
 
-    log = poll_log or _noop_log
-    own_browser = None
-    owned = False
+
+def _prepare_work_page(
+    *,
+    email: str,  # noqa: ARG001
+    page: Any | None,
+    proxy: str | None,
+    headless: bool,
+    force_standalone: bool,
+    cookies: Any | None,
+    reuse_browser: bool,
+    recycle_every: int,
+    log: LogFn,
+) -> tuple[Any, Any | None, bool, Any]:
+    """Return (work_page, own_browser, owned, resolved_proxy)."""
+    from .proxyutil import resolve_proxy, set_runtime_proxy
+
     work_page = None if (force_standalone and page is None) else page
     if force_standalone and page is not None:
         work_page = None
     resolved = resolve_proxy(proxy)
     set_runtime_proxy(resolved or None)
+    own_browser = None
+    owned = False
+    if work_page is None:
+        own_browser, work_page, owned = acquire_mint_browser(
+            proxy=resolved or None,
+            headless=headless,
+            reuse=reuse_browser,
+            recycle_every=recycle_every,
+            log=log,
+        )
+    if cookies and page is None:
+        n = inject_cookies(work_page, cookies, log=log)
+        log(f"cookie inject count={n}")
+        try:
+            work_page.get("https://accounts.x.ai/")
+            _sleep(1.0)
+            url = _page_url(work_page)
+            text = _visible_text(work_page)
+            snip = _norm(text)[:120]
+            log(f"post-inject session url={url[:120]} visible={snip}")
+        except Exception as e:
+            log(f"post-inject check: {e}")
+    return work_page, own_browser, owned, resolved
+
+
+def _cleanup_work_page(
+    *,
+    page: Any | None,
+    work_page: Any,
+    own_browser: Any | None,
+    owned: bool,
+    success: bool,
+    log: LogFn,
+) -> None:
+    if own_browser is not None:
+        if owned:
+            close_standalone(own_browser)
+        else:
+            release_mint_browser(owned=False, success=success, log=log)
+
+
+def _mint_auth_code(
+    *,
+    email: str,
+    password: str,
+    page: Any | None,
+    proxy: str | None,
+    headless: bool,
+    browser_timeout_sec: float,
+    poll_log: LogFn | None,
+    cancel: Callable[[], bool] | None,
+    force_standalone: bool,
+    cookies: Any | None,
+    reuse_browser: bool,
+    recycle_every: int,
+) -> dict[str, Any]:
+    """9router-identical: authorization_code + PKCE + loopback :56121."""
+    from .oauth_authcode import (
+        LoopbackServer,
+        OAuthAuthCodeError,
+        create_auth_session,
+        exchange_code,
+    )
+    from .proxyutil import proxy_log_label
+
+    log = poll_log or _noop_log
+    work_page, own_browser, owned, resolved = _prepare_work_page(
+        email=email,
+        page=page,
+        proxy=proxy,
+        headless=headless,
+        force_standalone=force_standalone,
+        cookies=cookies,
+        reuse_browser=reuse_browser,
+        recycle_every=recycle_every,
+        log=log,
+    )
+    success = False
+    loop: LoopbackServer | None = None
+    try:
+        loop = LoopbackServer()
+        loop.start()
+        sess = create_auth_session(redirect_uri=loop.redirect_uri)
+        log(
+            f"auth-code PKCE start redirect={sess.redirect_uri} "
+            f"proxy={proxy_log_label(resolved) or '(none)'}"
+        )
+
+        # DrissionPage is not thread-safe — drive UI on this thread.
+        # Loopback HTTPServer already runs in its own daemon thread.
+        browser_params: dict[str, str] | None = None
+        try:
+            browser_params = approve_auth_code(
+                work_page,
+                authorize_url=sess.authorize_url,
+                email=email,
+                password=password,
+                expected_state=sess.state,
+                timeout_sec=browser_timeout_sec,
+                stop_event=None,
+                log=log,
+                early_done=loop.snapshot,
+            )
+        except BrowserConfirmError as e:
+            snap = loop.snapshot()
+            if not (snap and snap.get("code")):
+                raise
+            log(f"browser warn after loopback capture: {e}")
+            browser_params = snap
+
+        if cancel and cancel():
+            raise OAuthAuthCodeError("cancelled")
+
+        cb = browser_params if browser_params and browser_params.get("code") else loop.snapshot()
+        if not cb or not cb.get("code"):
+            try:
+                cb = loop.wait(timeout=8)
+                log("auth-code captured via loopback (late)")
+            except OAuthAuthCodeError:
+                raise OAuthAuthCodeError("no authorization code from browser/loopback") from None
+        else:
+            log("auth-code captured")
+
+        if cb.get("error"):
+            raise OAuthAuthCodeError(
+                f"oauth denied: {cb.get('error')}: {cb.get('error_description') or ''}"
+            )
+        code = (cb.get("code") or "").strip()
+        if not code:
+            raise OAuthAuthCodeError(f"callback missing code: {cb!r}")
+        if cb.get("state") and cb.get("state") != sess.state:
+            raise OAuthAuthCodeError(
+                f"state mismatch expected={sess.state!r} got={cb.get('state')!r}"
+            )
+
+        log("exchanging authorization_code…")
+        tr = exchange_code(
+            code=code,
+            code_verifier=sess.code_verifier,
+            redirect_uri=sess.redirect_uri,
+            proxy=resolved or None,
+            log=log,
+        )
+        success = True
+        return {
+            "access_token": tr.access_token,
+            "refresh_token": tr.refresh_token,
+            "id_token": tr.id_token,
+            "token_type": tr.token_type,
+            "expires_in": tr.expires_in,
+            "auth_method": "authorization_code",
+        }
+    finally:
+        if loop is not None:
+            loop.close()
+        _cleanup_work_page(
+            page=page,
+            work_page=work_page,
+            own_browser=own_browser,
+            owned=owned,
+            success=success,
+            log=log,
+        )
+
+
+def _mint_device_code(
+    *,
+    email: str,
+    password: str,
+    page: Any | None,
+    proxy: str | None,
+    headless: bool,
+    browser_timeout_sec: float,
+    poll_log: LogFn | None,
+    cancel: Callable[[], bool] | None,
+    force_standalone: bool,
+    cookies: Any | None,
+    reuse_browser: bool,
+    recycle_every: int,
+) -> dict[str, Any]:
+    """Legacy device-code grant (often Access denied after UI authorize)."""
+    from .oauth_device import OAuthDeviceError, poll_device_token, request_device_code
+    from .proxyutil import proxy_log_label
+
+    log = poll_log or _noop_log
+    work_page, own_browser, owned, resolved = _prepare_work_page(
+        email=email,
+        page=page,
+        proxy=proxy,
+        headless=headless,
+        force_standalone=force_standalone,
+        cookies=cookies,
+        reuse_browser=reuse_browser,
+        recycle_every=recycle_every,
+        log=log,
+    )
     success = False
     try:
         last_err: BaseException | None = None
@@ -1293,57 +1974,6 @@ def mint_with_browser(
             f"proxy={proxy_log_label(resolved) or '(none)'}"
         )
 
-        if work_page is None:
-            own_browser, work_page, owned = acquire_mint_browser(
-                proxy=resolved or None,
-                headless=headless,
-                reuse=reuse_browser,
-                recycle_every=recycle_every,
-                log=log,
-            )
-            if owned:
-                # non-reuse path: track for finally close
-                pass
-
-        # Cookie inject only for standalone browsers (reuse page is already logged in)
-        if cookies and page is None:
-            n = inject_cookies(work_page, cookies, log=log)
-            log(f"cookie inject count={n}")
-            try:
-                work_page.get("https://accounts.x.ai/")
-                _sleep(1.0)
-                url = _page_url(work_page)
-                text = _visible_text(work_page)
-                snip = _norm(text)[:120]
-                log(f"post-inject session url={url[:120]} visible={snip}")
-            except Exception as e:
-                log(f"post-inject check: {e}")
-
-        stop_event = threading.Event()
-        token_box: dict[str, Any] = {}
-        err_box: dict[str, BaseException] = {}
-
-        def _poll() -> None:
-            try:
-                # Berikan jeda 8 detik agar backend xAI menyelesaikan sinkronisasi persetujuan dari browser
-                time.sleep(8.0)
-                tr = poll_device_token(
-                    sess.device_code,
-                    interval=max(sess.interval, 5),
-                    expires_in=min(sess.expires_in, int(browser_timeout_sec) + 60),
-                    log=log,
-                    cancel=cancel,
-                    proxy=resolved or None,
-                )
-                token_box["token"] = tr
-                stop_event.set()
-                log("token poll SUCCESS — stop_event set")
-            except BaseException as e:  # noqa: BLE001
-                err_box["err"] = e
-                stop_event.set()
-
-        t = threading.Thread(target=_poll, name="oauth-poll", daemon=True)
-        t.start()
         try:
             approve_device_code(
                 work_page,
@@ -1352,56 +1982,57 @@ def mint_with_browser(
                 password=password,
                 user_code=sess.user_code,
                 timeout_sec=browser_timeout_sec,
-                stop_event=stop_event,
+                stop_event=None,
                 log=log,
             )
-        except Exception as e:
-            if "token" in token_box:
-                log(f"browser confirm loop ended with token ready: {e}")
-            else:
-                msg = str(e)
-                # Non-retryable auth failures: abort mint immediately (backfill will skip)
-                low = msg.lower()
-                hard = (
-                    "auth failed" in low
-                    or "turnstile" in low
-                    or "cloudflare" in low
-                    or "blocked" in low
-                    or "access denied" in low
-                    or "错误的邮箱" in msg
-                    or "email salah" in msg.lower()
-                    or "email tidak valid" in msg.lower()
-                    or "password" in low
-                    or "browser confirm timeout" in low
-                )
-                if hard:
-                    log(f"browser confirm abort: {e}")
-                    stop_event.set()
-                    raise
-                log(f"browser confirm warning: {e}")
+        except BrowserConfirmError as e:
+            msg = str(e)
+            low = msg.lower()
+            hard = (
+                "auth failed" in low
+                or "turnstile" in low
+                or "cloudflare" in low
+                or "blocked" in low
+                or "access denied" in low
+                or "错误的邮箱" in msg
+                or "password" in low
+                or "browser confirm timeout" in low
+            )
+            if hard:
+                log(f"browser confirm abort: {e}")
+                raise
+            log(f"browser confirm warning: {e}")
 
-        t.join(timeout=max(browser_timeout_sec, 60) + 30)
-        if "token" in token_box:
-            tr = token_box["token"]
-            success = True
-            return {
-                "access_token": tr.access_token,
-                "refresh_token": tr.refresh_token,
-                "id_token": tr.id_token,
-                "token_type": tr.token_type,
-                "expires_in": tr.expires_in,
-                "user_code": sess.user_code,
-            }
-        if "err" in err_box:
-            raise err_box["err"]
-        raise OAuthDeviceError("token poll thread ended without result")
+        if cancel and cancel():
+            raise OAuthDeviceError("cancelled")
+
+        log("browser authorized; polling token...")
+        remaining = max(int(sess.expires_in) - 5, 30)
+        remaining = min(remaining, int(browser_timeout_sec) + 90)
+        tr = poll_device_token(
+            sess.device_code,
+            interval=max(int(sess.interval), 5),
+            expires_in=remaining,
+            log=log,
+            cancel=cancel,
+            proxy=resolved or None,
+        )
+        success = True
+        return {
+            "access_token": tr.access_token,
+            "refresh_token": tr.refresh_token,
+            "id_token": tr.id_token,
+            "token_type": tr.token_type,
+            "expires_in": tr.expires_in,
+            "user_code": sess.user_code,
+            "auth_method": "device_code",
+        }
     finally:
-        if page is not None and work_page is page:
-            try:
-                work_page.get("about:blank")
-                log("registration browser navigated back to about:blank")
-            except Exception:
-                pass
-        if own_browser is not None:
-            close_standalone(own_browser)
-            release_mint_browser(owned=False, success=success, force_quit=True, log=log)
+        _cleanup_work_page(
+            page=page,
+            work_page=work_page,
+            own_browser=own_browser,
+            owned=owned,
+            success=success,
+            log=log,
+        )
