@@ -10,12 +10,9 @@ from __future__ import annotations
 import os
 import shutil
 import sys
-import threading
 import time
 from pathlib import Path
 from typing import Any, Callable
-
-_CPA_MINT_LOCK = threading.Lock()
 _REG_DIR = Path(__file__).resolve().parent
 _DEFAULT_OUT = _REG_DIR / "cpa_auths"
 _DEFAULT_CPA = Path("")  # empty = do not assume a machine-local CPA path
@@ -119,9 +116,10 @@ def export_cpa_xai_for_account(
     base_url = cfg.get("cpa_base_url") or "https://cli-chat-proxy.grok.com/v1"
     cpa_headers = cfg.get("cpa_headers") or None
     force_standalone = bool(cfg.get("cpa_force_standalone", False))
-    cookie_inject = bool(cfg.get("cpa_mint_cookie_inject", True))
-    reuse_browser = bool(cfg.get("cpa_mint_browser_reuse", True))
-    recycle_every = int(cfg.get("cpa_mint_browser_recycle_every", 15) or 0)
+    # v2 defaults: no cookie inject; password / live session preferred
+    cookie_inject = bool(cfg.get("cpa_mint_cookie_inject", False))
+    reuse_browser = bool(cfg.get("cpa_mint_browser_reuse", False))
+    recycle_every = int(cfg.get("cpa_mint_browser_recycle_every", 1) or 0)
 
     reuse_page = None if force_standalone else page
 
@@ -156,8 +154,12 @@ def export_cpa_xai_for_account(
                 use_cookies = base
 
     out_dir.mkdir(parents=True, exist_ok=True)
+    oauth_flow = str(cfg.get("cpa_oauth_flow") or os.environ.get("CPA_OAUTH_FLOW") or "auth_code").strip()
+    if cfg.get("cpa_oauth_flow"):
+        os.environ["CPA_OAUTH_FLOW"] = oauth_flow
     log(
-        f"[cpa] mint OIDC for {email} -> {out_dir} proxy={proxy or '(none)'} "
+        f"[cpa] mint OIDC for {email} flow={oauth_flow} -> {out_dir} "
+        f"proxy={proxy or '(none)'} "
         f"cookies={len(use_cookies) if isinstance(use_cookies, list) else (1 if use_cookies else 0)} "
         f"reuse={reuse_browser}"
     )
@@ -165,8 +167,11 @@ def export_cpa_xai_for_account(
     def _log(msg: str) -> None:
         log(f"[cpa] {msg}")
 
-    with _CPA_MINT_LOCK:
-        result = mint_and_export(
+    # Delay 8.0 seconds to let xAI backend propagate/settle the new session cookie.
+    # This prevents the xAI backend from returning 'Access denied' on the consent page.
+    time.sleep(8.0)
+
+    result = mint_and_export(
             email=email,
             password=password,
             auth_dir=out_dir,
@@ -184,13 +189,6 @@ def export_cpa_xai_for_account(
             recycle_every=recycle_every,
             log=_log,
         )
-
-    # Navigate registration browser back to blank after reuse
-    if reuse_page is not None:
-        try:
-            reuse_page.get("about:blank")
-        except Exception:
-            pass
 
     if result.get("ok") and result.get("path") and cfg.get("cpa_copy_to_hotload", False) and cpa_dir:
         try:

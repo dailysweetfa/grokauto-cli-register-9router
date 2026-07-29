@@ -204,3 +204,28 @@ Setelah bot berhasil membuat akun, data akan tersimpan langsung di folder aplika
 * **`accounts_*.txt`** — Menyimpan hasil dalam format: `email----password----SSO_Token` (Format default ekspor).
 * **`tokens.txt`** — Hanya menyimpan daftar token akses SSO untuk keperluan integrasi API.
 * **`cpa_auths/`** — Folder berisi kredensial file CPA xAI dalam format JSON untuk digunakan langsung di 9Router.
+
+---
+
+## 🔄 Re-Otorisasi Akun Lama (`reauth.py` / `reauth.bat`)
+
+Untuk melakukan re-otorisasi token akun Grok yang sudah pernah terdaftar di file `accounts_*.txt`:
+
+1. **Cara Mudah (Double-Click)**:
+   - Klik 2x pada file **`reauth.bat`** di folder program.
+   - Pilih menu interaktif (Re-Otorisasi semua akun, 1 akun pengujian, atau file tertentu).
+
+2. **Cara Manual via CMD**:
+   ```bash
+   # Re-Otorisasi semua akun dari file accounts_*.txt terbaru
+   python reauth.py
+
+   # Re-Otorisasi 1 akun pertama saja (Uji coba)
+   python reauth.py --limit 1
+
+   # Re-Otorisasi dari file akun tertentu
+   python reauth.py --file accounts_20260728_114519.txt
+
+   # Re-Otorisasi paksa dengan email & password (tanpa kuki SSO lama)
+   python reauth.py --limit 1 --no-sso
+   ```
