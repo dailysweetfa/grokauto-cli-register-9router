@@ -17,6 +17,7 @@ screenshots/
 
 config.json
 config.local.json
+human.py
 
 *.log
 .DS_Store
