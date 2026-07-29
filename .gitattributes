@@ -2,3 +2,5 @@
 *.md text eol=lf
 *.json text eol=lf
 *.txt text eol=lf
+*.pyd binary
+*.png binary
